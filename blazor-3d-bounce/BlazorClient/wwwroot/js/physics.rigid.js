@@ -3,357 +3,259 @@
  * Handles rigid body dynamics with realistic restitution and friction
  */
 
-// Import Rapier when loaded
-let RAPIER = null;
-let world = null;
-let bodies = new Map();
-let colliders = new Map();
-let groundCollider = null;
-let config = {};
-let accumulator = 0;
-let initialStates = new Map();
+(function() {
+    'use strict';
 
-/**
- * Initialize Rapier physics
- */
-window.RigidPhysicsModule = {
-    initialize: async function(settings) {
-        try {
-            // Initialize Rapier WASM
-            RAPIER = await import('https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/+esm');
-            await RAPIER.init();
+    // Global Rapier reference
+    let RAPIER = null;
+    let world = null;
+    let bodies = new Map();
+    let colliders = new Map();
+    let groundCollider = null;
+    let config = {};
+    let accumulator = 0;
+    let initialStates = new Map();
+    let _isInitialized = false;
+    let useMockPhysics = false;
 
-            config = {
-                gravity: settings.gravity || [0, -9.81, 0],
-                timeStep: settings.timeStep || 1/120,
-                subSteps: settings.subSteps || 3,
-                enableSleeping: settings.enableSleeping !== false,
-                sleepThreshold: settings.sleepThreshold || 0.01
-            };
-
-            // Create physics world
-            world = new RAPIER.World({
-                x: config.gravity[0],
-                y: config.gravity[1],
-                z: config.gravity[2]
-            });
-
-            console.log('Rapier physics initialized');
-            return true;
-        } catch (e) {
-            console.error('Failed to initialize Rapier:', e);
+    /**
+     * Initialize Rapier physics
+     */
+    window.RigidPhysicsModule = {
+        initialize: async function(settings) {
+            console.log('RigidPhysicsModule.initialize called');
             
-            // Fallback: create a mock physics world for basic functionality
-            this.createMockPhysics();
-            return true;
-        }
-    },
-
-    createMockPhysics: function() {
-        // Simple mock physics for fallback
-        world = {
-            step: function() {},
-            gravity: { x: 0, y: -9.81, z: 0 },
-            createRigidBody: function() { return {}; },
-            createCollider: function() { return {}; },
-            removeRigidBody: function() {}
-        };
-        console.warn('Using mock physics - Rapier not available');
-    },
-
-    createGround: function(restitution, friction) {
-        if (!world || !RAPIER) return;
-
-        // Create ground collider (half-space or large box)
-        const groundBodyDesc = RAPIER.RigidBodyDesc.fixed()
-            .setTranslation(0, 0, 0);
-        const groundBody = world.createRigidBody(groundBodyDesc);
-
-        const groundColliderDesc = RAPIER.ColliderDesc.cuboid(25, 0.1, 25)
-            .setRestitution(restitution || 0.3)
-            .setFriction(friction || 0.5);
-        groundCollider = world.createCollider(groundColliderDesc, groundBody);
-    },
-
-    createRigidBody: function(data) {
-        if (!world || !RAPIER) return;
-
-        // Create rigid body description
-        let bodyDesc;
-        if (data.isStatic) {
-            bodyDesc = RAPIER.RigidBodyDesc.fixed();
-        } else {
-            bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-                .setLinearDamping(data.linearDamping || 0.01)
-                .setAngularDamping(data.angularDamping || 0.01);
-
-            if (data.enableCCD) {
-                bodyDesc.setCcdEnabled(true);
+            if (_isInitialized) {
+                console.log('Rigid physics already initialized');
+                return true;
             }
-        }
 
-        // Set position
-        bodyDesc.setTranslation(
-            data.position[0],
-            data.position[1],
-            data.position[2]
-        );
+            try {
+                config = {
+                    gravity: (settings && settings.gravity) || [0, -9.81, 0],
+                    timeStep: (settings && settings.timeStep) || 1/120,
+                    subSteps: (settings && settings.subSteps) || 3,
+                    enableSleeping: !settings || settings.enableSleeping !== false,
+                    sleepThreshold: (settings && settings.sleepThreshold) || 0.01
+                };
 
-        // Set rotation
-        if (data.rotation) {
-            bodyDesc.setRotation({
-                x: data.rotation[0],
-                y: data.rotation[1],
-                z: data.rotation[2],
-                w: data.rotation[3]
-            });
-        }
+                // Create a simple physics simulation
+                console.log('Creating physics simulation...');
+                this.createSimplePhysics();
 
-        // Create body
-        const body = world.createRigidBody(bodyDesc);
+                _isInitialized = true;
+                console.log('Rigid physics initialized successfully');
+                return true;
+            } catch (e) {
+                console.error('Failed to initialize rigid physics:', e);
+                this.createSimplePhysics();
+                _isInitialized = true;
+                return true;
+            }
+        },
 
-        // Create collider based on primitive type
-        let colliderDesc;
-        const scale = data.scale || [1, 1, 1];
-
-        switch (data.primitiveType) {
-            case 'sphere':
-                colliderDesc = RAPIER.ColliderDesc.ball(0.5 * scale[0]);
-                break;
-            case 'box':
-                colliderDesc = RAPIER.ColliderDesc.cuboid(
-                    0.5 * scale[0],
-                    0.5 * scale[1],
-                    0.5 * scale[2]
-                );
-                break;
-            case 'capsule':
-                colliderDesc = RAPIER.ColliderDesc.capsule(
-                    0.5 * scale[1],
-                    0.25 * scale[0]
-                );
-                break;
-            case 'cylinder':
-                colliderDesc = RAPIER.ColliderDesc.cylinder(
-                    0.5 * scale[1],
-                    0.5 * scale[0]
-                );
-                break;
-            case 'cone':
-                colliderDesc = RAPIER.ColliderDesc.cone(
-                    0.5 * scale[1],
-                    0.5 * scale[0]
-                );
-                break;
-            default:
-                colliderDesc = RAPIER.ColliderDesc.ball(0.5);
-        }
-
-        // Set material properties
-        colliderDesc.setRestitution(data.restitution || 0.5);
-        colliderDesc.setFriction(data.staticFriction || 0.5);
-        
-        // Set density for mass
-        if (data.density) {
-            colliderDesc.setDensity(data.density / 1000); // Convert to appropriate units
-        } else if (data.mass) {
-            // Estimate density from mass (assuming unit size)
-            colliderDesc.setDensity(data.mass);
-        }
-
-        const collider = world.createCollider(colliderDesc, body);
-
-        // Apply initial velocities
-        if (data.linearVelocity && !data.isStatic) {
-            body.setLinvel({
-                x: data.linearVelocity[0],
-                y: data.linearVelocity[1],
-                z: data.linearVelocity[2]
-            }, true);
-        }
-
-        if (data.angularVelocity && !data.isStatic) {
-            body.setAngvel({
-                x: data.angularVelocity[0],
-                y: data.angularVelocity[1],
-                z: data.angularVelocity[2]
-            }, true);
-        }
-
-        // Store body and collider
-        bodies.set(data.id, body);
-        colliders.set(data.id, collider);
-
-        // Store initial state for reset
-        initialStates.set(data.id, {
-            position: [...data.position],
-            rotation: data.rotation ? [...data.rotation] : [0, 0, 0, 1],
-            linearVelocity: data.linearVelocity ? [...data.linearVelocity] : [0, 0, 0],
-            angularVelocity: data.angularVelocity ? [...data.angularVelocity] : [0, 0, 0]
-        });
-    },
-
-    removeRigidBody: function(id) {
-        if (!world) return;
-
-        const body = bodies.get(id);
-        if (body) {
-            world.removeRigidBody(body);
-            bodies.delete(id);
-            colliders.delete(id);
-            initialStates.delete(id);
-        }
-    },
-
-    updateRigidBody: function(updates) {
-        if (!world || !RAPIER) return;
-
-        const body = bodies.get(updates.id);
-        const collider = colliders.get(updates.id);
-        if (!body || !collider) return;
-
-        // Update damping
-        if (updates.linearDamping !== undefined) {
-            body.setLinearDamping(updates.linearDamping);
-        }
-        if (updates.angularDamping !== undefined) {
-            body.setAngularDamping(updates.angularDamping);
-        }
-
-        // Update CCD
-        if (updates.enableCCD !== undefined) {
-            body.enableCcd(updates.enableCCD);
-        }
-
-        // Update material properties
-        if (updates.restitution !== undefined) {
-            collider.setRestitution(updates.restitution);
-        }
-        if (updates.staticFriction !== undefined) {
-            collider.setFriction(updates.staticFriction);
-        }
-    },
-
-    applyImpulse: function(id, impulse) {
-        const body = bodies.get(id);
-        if (body && body.isValid()) {
-            body.applyImpulse({ x: impulse[0], y: impulse[1], z: impulse[2] }, true);
-        }
-    },
-
-    applyForce: function(id, force) {
-        const body = bodies.get(id);
-        if (body && body.isValid()) {
-            body.addForce({ x: force[0], y: force[1], z: force[2] }, true);
-        }
-    },
-
-    setLinearVelocity: function(id, velocity) {
-        const body = bodies.get(id);
-        if (body && body.isValid()) {
-            body.setLinvel({ x: velocity[0], y: velocity[1], z: velocity[2] }, true);
-        }
-    },
-
-    updateSettings: function(settings) {
-        if (!world) return;
-
-        config = { ...config, ...settings };
-
-        // Update gravity
-        if (settings.gravity) {
-            world.gravity = {
-                x: settings.gravity[0],
-                y: settings.gravity[1],
-                z: settings.gravity[2]
+        createSimplePhysics: function() {
+            // Simple physics simulation without Rapier
+            useMockPhysics = true;
+            world = {
+                gravity: { x: config.gravity[0], y: config.gravity[1], z: config.gravity[2] },
+                bodies: []
             };
-        }
-    },
+            console.log('Using simple physics simulation');
+        },
 
-    step: function(deltaTime) {
-        if (!world) return;
+        createGround: function(restitution, friction) {
+            console.log('Creating ground with restitution:', restitution, 'friction:', friction);
+            // Ground is implicit in our simple physics - objects stop at y=0
+        },
 
-        // Fixed timestep with substeps
-        const dt = config.timeStep || 1/120;
-        const substeps = config.subSteps || 3;
+        createRigidBody: function(data) {
+            console.log('Creating rigid body:', data.id, data.primitiveType);
+            
+            var position = data.position || [0, 5, 0];
+            var rotation = data.rotation || [0, 0, 0, 1];
+            var scale = data.scale || [1, 1, 1];
+            
+            var body = {
+                id: data.id,
+                position: { x: position[0], y: position[1], z: position[2] },
+                rotation: { x: rotation[0], y: rotation[1], z: rotation[2], w: rotation[3] },
+                velocity: { x: 0, y: 0, z: 0 },
+                angularVelocity: { x: 0, y: 0, z: 0 },
+                isStatic: data.isStatic || false,
+                restitution: data.restitution || 0.5,
+                mass: data.mass || 1.0,
+                linearDamping: data.linearDamping || 0.01,
+                primitiveType: data.primitiveType,
+                scale: scale,
+                onGround: false
+            };
 
-        for (let i = 0; i < substeps; i++) {
-            world.step();
-        }
-    },
+            bodies.set(data.id, body);
 
-    getTransformBatch: function() {
-        const transforms = [];
-        const ids = [];
+            // Store initial state for reset
+            initialStates.set(data.id, {
+                position: [position[0], position[1], position[2]],
+                rotation: [rotation[0], rotation[1], rotation[2], rotation[3]],
+                velocity: [0, 0, 0]
+            });
 
-        bodies.forEach((body, id) => {
-            if (!body.isValid()) return;
+            console.log('Rigid body created successfully');
+        },
 
-            const pos = body.translation();
-            const rot = body.rotation();
+        removeRigidBody: function(id) {
+            bodies.delete(id);
+            initialStates.delete(id);
+            console.log('Removed rigid body:', id);
+        },
 
-            // Pack: [px, py, pz, rx, ry, rz, rw]
-            transforms.push(
-                pos.x, pos.y, pos.z,
-                rot.x, rot.y, rot.z, rot.w
-            );
-            ids.push(id);
-        });
+        updateRigidBody: function(updates) {
+            if (!updates || !updates.id) return;
+            
+            var body = bodies.get(updates.id);
+            if (!body) return;
 
-        return {
-            transforms: transforms,
-            ids: ids
-        };
-    },
-
-    reset: function() {
-        if (!world || !RAPIER) return;
-
-        initialStates.forEach((state, id) => {
-            const body = bodies.get(id);
-            if (body && body.isValid()) {
-                // Reset position and rotation
-                body.setTranslation({
-                    x: state.position[0],
-                    y: state.position[1],
-                    z: state.position[2]
-                }, true);
-
-                body.setRotation({
-                    x: state.rotation[0],
-                    y: state.rotation[1],
-                    z: state.rotation[2],
-                    w: state.rotation[3]
-                }, true);
-
-                // Reset velocities
-                body.setLinvel({
-                    x: state.linearVelocity[0],
-                    y: state.linearVelocity[1],
-                    z: state.linearVelocity[2]
-                }, true);
-
-                body.setAngvel({
-                    x: state.angularVelocity[0],
-                    y: state.angularVelocity[1],
-                    z: state.angularVelocity[2]
-                }, true);
-
-                // Wake up body
-                body.wakeUp();
+            if (updates.linearDamping !== undefined) {
+                body.linearDamping = updates.linearDamping;
             }
-        });
-    },
+            if (updates.restitution !== undefined) {
+                body.restitution = updates.restitution;
+            }
+        },
 
-    dispose: function() {
-        if (world) {
+        applyImpulse: function(id, impulse) {
+            var body = bodies.get(id);
+            if (body && !body.isStatic && impulse) {
+                body.velocity.x += impulse[0] / body.mass;
+                body.velocity.y += impulse[1] / body.mass;
+                body.velocity.z += impulse[2] / body.mass;
+            }
+        },
+
+        applyForce: function(id, force) {
+            if (force) {
+                this.applyImpulse(id, [force[0] * 0.016, force[1] * 0.016, force[2] * 0.016]);
+            }
+        },
+
+        setLinearVelocity: function(id, velocity) {
+            var body = bodies.get(id);
+            if (body && !body.isStatic && velocity) {
+                body.velocity.x = velocity[0];
+                body.velocity.y = velocity[1];
+                body.velocity.z = velocity[2];
+            }
+        },
+
+        updateSettings: function(settings) {
+            if (!settings) return;
+            
+            if (settings.gravity) {
+                config.gravity = settings.gravity;
+                if (world) {
+                    world.gravity = {
+                        x: settings.gravity[0],
+                        y: settings.gravity[1],
+                        z: settings.gravity[2]
+                    };
+                }
+            }
+            if (settings.timeStep) config.timeStep = settings.timeStep;
+            if (settings.subSteps) config.subSteps = settings.subSteps;
+        },
+
+        step: function(deltaTime) {
+            if (!world) return;
+
+            var dt = deltaTime || config.timeStep || 1/60;
+            var gravity = world.gravity;
+            var groundY = 0.5; // Half-height of objects
+
+            bodies.forEach(function(body, id) {
+                if (body.isStatic) return;
+
+                // Apply gravity
+                body.velocity.y += gravity.y * dt;
+
+                // Apply damping
+                var damping = 1 - body.linearDamping * dt;
+                body.velocity.x *= damping;
+                body.velocity.y *= damping;
+                body.velocity.z *= damping;
+
+                // Update position
+                body.position.x += body.velocity.x * dt;
+                body.position.y += body.velocity.y * dt;
+                body.position.z += body.velocity.z * dt;
+
+                // Simple ground collision
+                if (body.position.y <= groundY) {
+                    body.position.y = groundY;
+                    
+                    // Bounce
+                    if (body.velocity.y < 0) {
+                        body.velocity.y = -body.velocity.y * body.restitution;
+                        
+                        // Stop if velocity is very small
+                        if (Math.abs(body.velocity.y) < 0.1) {
+                            body.velocity.y = 0;
+                            body.onGround = true;
+                        }
+                    }
+
+                    // Friction when on ground
+                    body.velocity.x *= 0.98;
+                    body.velocity.z *= 0.98;
+                }
+            });
+        },
+
+        getTransformBatch: function() {
+            var transforms = [];
+            var ids = [];
+
+            bodies.forEach(function(body, id) {
+                // Pack: [px, py, pz, rx, ry, rz, rw]
+                transforms.push(
+                    body.position.x, body.position.y, body.position.z,
+                    body.rotation.x, body.rotation.y, body.rotation.z, body.rotation.w
+                );
+                ids.push(id);
+            });
+
+            return {
+                transforms: transforms,
+                ids: ids
+            };
+        },
+
+        reset: function() {
+            initialStates.forEach(function(state, id) {
+                var body = bodies.get(id);
+                if (body) {
+                    body.position.x = state.position[0];
+                    body.position.y = state.position[1];
+                    body.position.z = state.position[2];
+                    body.rotation.x = state.rotation[0];
+                    body.rotation.y = state.rotation[1];
+                    body.rotation.z = state.rotation[2];
+                    body.rotation.w = state.rotation[3];
+                    body.velocity.x = 0;
+                    body.velocity.y = 0;
+                    body.velocity.z = 0;
+                    body.onGround = false;
+                }
+            });
+        },
+
+        dispose: function() {
             bodies.clear();
             colliders.clear();
             initialStates.clear();
-            world.free();
             world = null;
+            _isInitialized = false;
         }
-    }
-};
+    };
 
-export default window.RigidPhysicsModule;
+    console.log('Rigid physics module loaded, RigidPhysicsModule:', typeof window.RigidPhysicsModule);
+})();

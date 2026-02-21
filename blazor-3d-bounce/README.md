@@ -35,11 +35,11 @@ A production-quality .NET 8 Blazor WebAssembly application featuring realistic 3
 - ?? Wireframe visualization mode
 
 ### User Interface
-- ?? Intuitive toolbar with spawn controls
+- ??? Intuitive toolbar with spawn controls
 - ?? Inspector panel for object properties
 - ?? Real-time performance statistics (FPS, physics time)
 - ?? Dark theme with responsive design
-- ? Keyboard accessible
+- ?? Keyboard accessible
 
 ## ?? Quick Start
 
@@ -164,7 +164,7 @@ Volumetric soft body dropped on ground, showing pressure-based volume preservati
 ## ?? Physics Models
 
 ### Rigid Body Restitution
-Post-impact normal velocity: `v_post = -e × v_pre`
+Post-impact normal velocity: `v_post = -e · v_pre`
 
 Energy retained per bounce: `E_n / E_0 ? e²`
 

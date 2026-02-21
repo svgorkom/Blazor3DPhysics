@@ -404,12 +404,16 @@ select.form-control {
     position: relative;
     background: var(--bg-primary);
     overflow: hidden;
+    min-height: 400px;
+    z-index: 1;
 }
 
 .viewport-canvas {
     width: 100%;
     height: 100%;
     display: block;
+    touch-action: none;
+    outline: none;
 }
 
 .viewport-overlay {
@@ -420,6 +424,7 @@ select.form-control {
     flex-direction: column;
     gap: var(--spacing-sm);
     pointer-events: none;
+    z-index: 10;
 }
 
 .viewport-overlay > * {
@@ -429,6 +434,7 @@ select.form-control {
 /* Inspector panel */
 .inspector {
     grid-area: inspector;
+    z-index: 2;
 }
 
 .inspector-empty {
@@ -528,6 +534,7 @@ select.form-control {
 /* Spawn panel / sidebar */
 .sidebar-panel {
     grid-area: sidebar;
+    z-index: 2;
 }
 
 .spawn-grid {

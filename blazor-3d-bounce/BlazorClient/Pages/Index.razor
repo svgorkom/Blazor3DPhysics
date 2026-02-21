@@ -6,121 +6,120 @@
 @inject ISceneStateService SceneState
 @implements IAsyncDisposable
 
-<div class="app-layout">
-    <Toolbar OnSpawnRigid="SpawnRigidBody" 
-             OnSpawnSoft="SpawnSoftBody" 
-             OnPlayPause="TogglePlayPause"
-             OnReset="ResetScene"
-             OnStep="StepSimulation"
-             OnLoadPreset="LoadPreset"
-             IsPaused="@SceneState.Settings.IsPaused" />
+<Toolbar OnSpawnRigid="SpawnRigidBody" 
+         OnSpawnSoft="SpawnSoftBody" 
+         OnPlayPause="TogglePlayPause"
+         OnReset="ResetScene"
+         OnStep="StepSimulation"
+         OnLoadPreset="LoadPreset"
+         IsPaused="@SceneState.Settings.IsPaused" />
+
+<div class="sidebar-panel panel">
+    <div class="panel-header">
+        <span><i class="bi bi-plus-circle"></i></span>
+        <span>Spawn Objects</span>
+    </div>
     
-    <div class="sidebar-panel panel">
-        <div class="panel-header">
-            <span><i class="bi bi-plus-circle"></i></span>
-            <span>Spawn Objects</span>
-        </div>
-        
-        <div class="panel-section">
-            <div class="panel-section-title">Rigid Bodies</div>
-            <div class="spawn-grid">
-                <button class="spawn-btn" @onclick="() => SpawnRigidBody(RigidPrimitiveType.Sphere)">
-                    <span class="spawn-btn-icon"><i class="bi bi-circle-fill"></i></span>
-                    <span class="spawn-btn-label">Sphere</span>
-                </button>
-                <button class="spawn-btn" @onclick="() => SpawnRigidBody(RigidPrimitiveType.Box)">
-                    <span class="spawn-btn-icon"><i class="bi bi-box-fill"></i></span>
-                    <span class="spawn-btn-label">Box</span>
-                </button>
-                <button class="spawn-btn" @onclick="() => SpawnRigidBody(RigidPrimitiveType.Capsule)">
-                    <span class="spawn-btn-icon"><i class="bi bi-capsule"></i></span>
-                    <span class="spawn-btn-label">Capsule</span>
-                </button>
-                <button class="spawn-btn" @onclick="() => SpawnRigidBody(RigidPrimitiveType.Cylinder)">
-                    <span class="spawn-btn-icon"><i class="bi bi-cylinder"></i></span>
-                    <span class="spawn-btn-label">Cylinder</span>
-                </button>
-            </div>
-        </div>
-        
-        <div class="panel-section">
-            <div class="panel-section-title">Soft Bodies</div>
-            <div class="spawn-grid">
-                <button class="spawn-btn" @onclick="() => SpawnSoftBody(SoftBodyType.Cloth)" disabled="@(!_softBodyAvailable)">
-                    <span class="spawn-btn-icon"><i class="bi bi-grid-3x3"></i></span>
-                    <span class="spawn-btn-label">Cloth</span>
-                </button>
-                <button class="spawn-btn" @onclick="() => SpawnSoftBody(SoftBodyType.Rope)" disabled="@(!_softBodyAvailable)">
-                    <span class="spawn-btn-icon"><i class="bi bi-bezier2"></i></span>
-                    <span class="spawn-btn-label">Rope</span>
-                </button>
-                <button class="spawn-btn" @onclick="() => SpawnSoftBody(SoftBodyType.Volumetric)" disabled="@(!_softBodyAvailable)">
-                    <span class="spawn-btn-icon"><i class="bi bi-dice-3-fill"></i></span>
-                    <span class="spawn-btn-label">Jelly</span>
-                </button>
-            </div>
-            @if (!_softBodyAvailable)
-            {
-                <p class="text-warning mt-sm" style="font-size: 0.75rem;">
-                    <i class="bi bi-exclamation-triangle"></i> Soft body physics unavailable. Using rigid approximation.
-                </p>
-            }
-        </div>
-        
-        <div class="panel-section">
-            <div class="panel-section-title">Scene Objects</div>
-            <div class="object-list">
-                @foreach (var body in SceneState.RigidBodies)
-                {
-                    <div class="object-item @(body.IsSelected ? "selected" : "")" 
-                         @onclick="() => SelectObject(body.Id)">
-                        <span class="object-icon rigid"><i class="bi bi-circle-fill"></i></span>
-                        <span class="object-name">@body.Name</span>
-                        <span class="object-type">@body.PrimitiveType</span>
-                    </div>
-                }
-                @foreach (var body in SceneState.SoftBodies)
-                {
-                    <div class="object-item @(body.IsSelected ? "selected" : "")" 
-                         @onclick="() => SelectObject(body.Id)">
-                        <span class="object-icon soft"><i class="bi bi-droplet-fill"></i></span>
-                        <span class="object-name">@body.Name</span>
-                        <span class="object-type">@body.Type</span>
-                    </div>
-                }
-                @if (SceneState.RigidBodies.Count == 0 && SceneState.SoftBodies.Count == 0)
-                {
-                    <div class="inspector-empty" style="height: 100px;">
-                        <span class="text-muted">No objects in scene</span>
-                    </div>
-                }
-            </div>
+    <div class="panel-section">
+        <div class="panel-section-title">Rigid Bodies</div>
+        <div class="spawn-grid">
+            <button class="spawn-btn" @onclick="() => SpawnRigidBody(RigidPrimitiveType.Sphere)">
+                <span class="spawn-btn-icon"><i class="bi bi-circle-fill"></i></span>
+                <span class="spawn-btn-label">Sphere</span>
+            </button>
+            <button class="spawn-btn" @onclick="() => SpawnRigidBody(RigidPrimitiveType.Box)">
+                <span class="spawn-btn-icon"><i class="bi bi-box-fill"></i></span>
+                <span class="spawn-btn-label">Box</span>
+            </button>
+            <button class="spawn-btn" @onclick="() => SpawnRigidBody(RigidPrimitiveType.Capsule)">
+                <span class="spawn-btn-icon"><i class="bi bi-capsule"></i></span>
+                <span class="spawn-btn-label">Capsule</span>
+            </button>
+            <button class="spawn-btn" @onclick="() => SpawnRigidBody(RigidPrimitiveType.Cylinder)">
+                <span class="spawn-btn-icon"><i class="bi bi-cylinder"></i></span>
+                <span class="spawn-btn-label">Cylinder</span>
+            </button>
         </div>
     </div>
     
-    <Viewport @ref="_viewport" CanvasId="renderCanvas" OnObjectSelected="SelectObject" />
+    <div class="panel-section">
+        <div class="panel-section-title">Soft Bodies</div>
+        <div class="spawn-grid">
+            <button class="spawn-btn" @onclick="() => SpawnSoftBody(SoftBodyType.Cloth)" disabled="@(!_softBodyAvailable)">
+                <span class="spawn-btn-icon"><i class="bi bi-grid-3x3"></i></span>
+                <span class="spawn-btn-label">Cloth</span>
+            </button>
+            <button class="spawn-btn" @onclick="() => SpawnSoftBody(SoftBodyType.Rope)" disabled="@(!_softBodyAvailable)">
+                <span class="spawn-btn-icon"><i class="bi bi-bezier2"></i></span>
+                <span class="spawn-btn-label">Rope</span>
+            </button>
+            <button class="spawn-btn" @onclick="() => SpawnSoftBody(SoftBodyType.Volumetric)" disabled="@(!_softBodyAvailable)">
+                <span class="spawn-btn-icon"><i class="bi bi-dice-3-fill"></i></span>
+                <span class="spawn-btn-label">Jelly</span>
+            </button>
+        </div>
+        @if (!_softBodyAvailable)
+        {
+            <p class="text-warning mt-sm" style="font-size: 0.75rem;">
+                <i class="bi bi-exclamation-triangle"></i> Soft body physics unavailable. Using rigid approximation.
+            </p>
+        }
+    </div>
     
-    <Inspector SelectedRigidBody="@SceneState.SelectedRigidBody"
-               SelectedSoftBody="@SceneState.SelectedSoftBody"
-               SimulationSettings="@SceneState.Settings"
-               RenderSettings="@SceneState.RenderSettings"
-               OnRigidBodyChanged="UpdateRigidBody"
-               OnSoftBodyChanged="UpdateSoftBody"
-               OnSettingsChanged="UpdateSettings"
-               OnRenderSettingsChanged="UpdateRenderSettings"
-               OnDeleteObject="DeleteSelectedObject" />
-    
-    <Stats FPS="@_fps" 
-           PhysicsTimeMs="@_physicsTimeMs" 
-           RigidBodyCount="@SceneState.RigidBodies.Count"
-           SoftBodyCount="@SceneState.SoftBodies.Count" />
+    <div class="panel-section">
+        <div class="panel-section-title">Scene Objects</div>
+        <div class="object-list">
+            @foreach (var body in SceneState.RigidBodies)
+            {
+                <div class="object-item @(body.IsSelected ? "selected" : "")" 
+                     @onclick="() => SelectObject(body.Id)">
+                    <span class="object-icon rigid"><i class="bi bi-circle-fill"></i></span>
+                    <span class="object-name">@body.Name</span>
+                    <span class="object-type">@body.PrimitiveType</span>
+                </div>
+            }
+            @foreach (var body in SceneState.SoftBodies)
+            {
+                <div class="object-item @(body.IsSelected ? "selected" : "")" 
+                     @onclick="() => SelectObject(body.Id)">
+                    <span class="object-icon soft"><i class="bi bi-droplet-fill"></i></span>
+                    <span class="object-name">@body.Name</span>
+                    <span class="object-type">@body.Type</span>
+                </div>
+            }
+            @if (SceneState.RigidBodies.Count == 0 && SceneState.SoftBodies.Count == 0)
+            {
+                <div class="inspector-empty" style="height: 100px;">
+                    <span class="text-muted">No objects in scene</span>
+                </div>
+            }
+        </div>
+    </div>
 </div>
+
+<Viewport @ref="_viewport" CanvasId="renderCanvas" OnObjectSelected="SelectObject" />
+
+<Inspector SelectedRigidBody="@SceneState.SelectedRigidBody"
+           SelectedSoftBody="@SceneState.SelectedSoftBody"
+           SimulationSettings="@SceneState.Settings"
+           RenderSettings="@SceneState.RenderSettings"
+           OnRigidBodyChanged="UpdateRigidBody"
+           OnSoftBodyChanged="UpdateSoftBody"
+           OnSettingsChanged="UpdateSettings"
+           OnRenderSettingsChanged="UpdateRenderSettings"
+           OnDeleteObject="DeleteSelectedObject" />
+
+<Stats FPS="@_fps" 
+       PhysicsTimeMs="@_physicsTimeMs" 
+       RigidBodyCount="@SceneState.RigidBodies.Count"
+       SoftBodyCount="@SceneState.SoftBodies.Count" />
 
 @code {
     private Viewport? _viewport;
     private bool _initialized;
     private bool _softBodyAvailable;
-    private System.Timers.Timer? _simulationTimer;
+    private PeriodicTimer? _simulationTimer;
+    private CancellationTokenSource? _timerCts;
     private float _fps;
     private float _physicsTimeMs;
     private DateTime _lastFrameTime = DateTime.UtcNow;
@@ -138,35 +137,63 @@
     {
         try
         {
+            Console.WriteLine("Starting initialization...");
+            
             // Initialize interop
             await Interop.InitializeAsync("renderCanvas");
+            Console.WriteLine("Interop initialized");
 
             // Initialize rendering
             await RenderingService.InitializeAsync("renderCanvas", SceneState.RenderSettings);
+            Console.WriteLine("Rendering initialized");
 
             // Initialize rigid physics
             await RigidPhysics.InitializeAsync(SceneState.Settings);
             await RigidPhysics.CreateGroundAsync(0.3f, 0.5f);
+            Console.WriteLine("Rigid physics initialized");
 
             // Initialize soft physics
             await SoftPhysics.InitializeAsync(SceneState.Settings);
             _softBodyAvailable = await SoftPhysics.IsAvailableAsync();
-
-            // Start simulation loop
-            _simulationTimer = new System.Timers.Timer(1000.0 / 60.0); // 60 FPS target
-            _simulationTimer.Elapsed += async (s, e) => await SimulationTickAsync();
-            _simulationTimer.Start();
+            Console.WriteLine($"Soft physics initialized, available: {_softBodyAvailable}");
 
             _initialized = true;
             
             // Subscribe to state changes
             SceneState.OnStateChanged += StateHasChanged;
 
+            // Start simulation loop using PeriodicTimer (works in WASM)
+            _timerCts = new CancellationTokenSource();
+            _ = RunSimulationLoopAsync(_timerCts.Token);
+
+            Console.WriteLine("Initialization complete");
             StateHasChanged();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Initialization error: {ex.Message}");
+            Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    private async Task RunSimulationLoopAsync(CancellationToken cancellationToken)
+    {
+        _simulationTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(1000.0 / 60.0));
+        
+        try
+        {
+            while (await _simulationTimer.WaitForNextTickAsync(cancellationToken))
+            {
+                await SimulationTickAsync();
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when disposed
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Simulation loop error: {ex.Message}");
         }
     }
 
@@ -206,7 +233,10 @@
 
             // Get transforms and update rendering
             var rigidBatch = await RigidPhysics.GetTransformBatchAsync();
-            await Interop.CommitRigidTransformsAsync(rigidBatch.Transforms, rigidBatch.Ids);
+            if (rigidBatch.Ids.Length > 0)
+            {
+                await Interop.CommitRigidTransformsAsync(rigidBatch.Transforms, rigidBatch.Ids);
+            }
 
             // Update soft body vertices
             if (_softBodyAvailable && SceneState.SoftBodies.Count > 0)
@@ -221,7 +251,7 @@
             // Calculate FPS
             _fps = deltaTime > 0 ? 1f / deltaTime : 0;
 
-            await InvokeAsync(StateHasChanged);
+            StateHasChanged();
         }
         catch (Exception ex)
         {
@@ -397,7 +427,7 @@
 
     public async ValueTask DisposeAsync()
     {
-        _simulationTimer?.Stop();
+        _timerCts?.Cancel();
         _simulationTimer?.Dispose();
         
         SceneState.OnStateChanged -= StateHasChanged;
