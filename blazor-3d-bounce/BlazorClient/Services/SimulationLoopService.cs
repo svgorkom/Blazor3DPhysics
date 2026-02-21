@@ -1,4 +1,5 @@
 using BlazorClient.Models;
+using BlazorClient.Services.Events;
 
 namespace BlazorClient.Services;
 
@@ -54,6 +55,9 @@ public class SimulationLoopService : ISimulationLoopService
     private readonly ISoftPhysicsService _softPhysics;
     private readonly IInteropService _interop;
     private readonly ISceneStateService _sceneState;
+    private readonly IPerformanceMonitor _performanceMonitor;
+    private readonly IEventAggregator _events;
+    private readonly ArrayPool<float> _transformPool;
 
     private PeriodicTimer? _simulationTimer;
     private CancellationTokenSource? _timerCts;
@@ -62,20 +66,26 @@ public class SimulationLoopService : ISimulationLoopService
     private bool _isRunning;
 
     public event Action? OnSimulationStateChanged;
-    public float Fps { get; private set; }
-    public float PhysicsTimeMs { get; private set; }
+    public float Fps => _performanceMonitor.GetSnapshot().Fps;
+    public float PhysicsTimeMs => _performanceMonitor.GetAverageTiming("Physics");
     public bool IsRunning => _isRunning;
 
     public SimulationLoopService(
         IRigidPhysicsService rigidPhysics,
         ISoftPhysicsService softPhysics,
         IInteropService interop,
-        ISceneStateService sceneState)
+        ISceneStateService sceneState,
+        IPerformanceMonitor performanceMonitor,
+        IEventAggregator events,
+        ArrayPool<float> transformPool)
     {
         _rigidPhysics = rigidPhysics;
         _softPhysics = softPhysics;
         _interop = interop;
         _sceneState = sceneState;
+        _performanceMonitor = performanceMonitor;
+        _events = events;
+        _transformPool = transformPool;
     }
 
     /// <inheritdoc />
@@ -87,6 +97,7 @@ public class SimulationLoopService : ISimulationLoopService
         _timerCts = new CancellationTokenSource();
         _lastFrameTime = DateTime.UtcNow;
         _accumulator = 0;
+        _performanceMonitor.Reset();
 
         _ = RunSimulationLoopAsync(_timerCts.Token);
     }
@@ -105,8 +116,17 @@ public class SimulationLoopService : ISimulationLoopService
     /// <inheritdoc />
     public async Task StepOnceAsync()
     {
-        await ExecutePhysicsStepAsync(_sceneState.Settings.TimeStep);
-        await SynchronizeTransformsAsync();
+        using (_performanceMonitor.MeasureTiming("Physics"))
+        {
+            await ExecutePhysicsStepAsync(_sceneState.Settings.TimeStep);
+        }
+
+        using (_performanceMonitor.MeasureTiming("Interop"))
+        {
+            await SynchronizeTransformsAsync();
+        }
+
+        PublishPhysicsEvent(_sceneState.Settings.TimeStep);
         OnSimulationStateChanged?.Invoke();
     }
 
@@ -128,6 +148,10 @@ public class SimulationLoopService : ISimulationLoopService
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Simulation loop error: {ex.Message}");
+            _events.Publish(new ErrorOccurredEvent(
+                "Simulation loop error", 
+                ex.Message, 
+                ErrorSeverity.Error));
         }
     }
 
@@ -137,34 +161,51 @@ public class SimulationLoopService : ISimulationLoopService
 
         try
         {
-            var now = DateTime.UtcNow;
-            var deltaTime = (float)(now - _lastFrameTime).TotalSeconds;
-            _lastFrameTime = now;
-
-            // Clamp delta time to prevent spiral of death
-            deltaTime = Math.Min(deltaTime, 0.1f);
-
-            var physicsStart = DateTime.UtcNow;
-
-            // Fixed timestep accumulator
-            _accumulator += deltaTime * _sceneState.Settings.TimeScale;
-            var fixedDt = _sceneState.Settings.TimeStep;
-
-            while (_accumulator >= fixedDt)
+            using (_performanceMonitor.MeasureTiming("Frame"))
             {
-                await ExecutePhysicsStepAsync(fixedDt);
-                _accumulator -= fixedDt;
+                var now = DateTime.UtcNow;
+                var deltaTime = (float)(now - _lastFrameTime).TotalSeconds;
+                _lastFrameTime = now;
+
+                // Clamp delta time to prevent spiral of death
+                deltaTime = Math.Min(deltaTime, 0.1f);
+
+                // Fixed timestep accumulator
+                _accumulator += deltaTime * _sceneState.Settings.TimeScale;
+                var fixedDt = _sceneState.Settings.TimeStep;
+                var stepsThisFrame = 0;
+
+                while (_accumulator >= fixedDt && stepsThisFrame < 8) // Cap steps per frame
+                {
+                    using (_performanceMonitor.MeasureTiming("Physics"))
+                    {
+                        await ExecutePhysicsStepAsync(fixedDt);
+                    }
+
+                    _accumulator -= fixedDt;
+                    stepsThisFrame++;
+                }
+
+                // Synchronize transforms with rendering
+                using (_performanceMonitor.MeasureTiming("Interop"))
+                {
+                    await SynchronizeTransformsAsync();
+                }
+
+                // Update performance stats
+                _performanceMonitor.RecordFrame();
+                _performanceMonitor.UpdateBodyCounts(
+                    _sceneState.RigidBodies.Count,
+                    _sceneState.SoftBodies.Count);
+
+                // Publish physics event for interested subscribers
+                if (stepsThisFrame > 0)
+                {
+                    PublishPhysicsEvent(fixedDt * stepsThisFrame);
+                }
+
+                OnSimulationStateChanged?.Invoke();
             }
-
-            PhysicsTimeMs = (float)(DateTime.UtcNow - physicsStart).TotalMilliseconds;
-
-            // Synchronize transforms with rendering
-            await SynchronizeTransformsAsync();
-
-            // Calculate FPS
-            Fps = deltaTime > 0 ? 1f / deltaTime : 0;
-
-            OnSimulationStateChanged?.Invoke();
         }
         catch (Exception ex)
         {
@@ -200,6 +241,15 @@ public class SimulationLoopService : ISimulationLoopService
                 await _interop.CommitSoftVerticesAsync(id, data.Vertices, data.Normals);
             }
         }
+    }
+
+    private void PublishPhysicsEvent(float deltaTime)
+    {
+        _events.Publish(new PhysicsSteppedEvent(
+            deltaTime,
+            _performanceMonitor.GetAverageTiming("Physics"),
+            _sceneState.RigidBodies.Count,
+            _sceneState.SoftBodies.Count));
     }
 
     /// <inheritdoc />

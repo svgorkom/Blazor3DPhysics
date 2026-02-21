@@ -274,6 +274,38 @@
         }
     };
 
+    /**
+     * Download file utility function for scene export
+     * Called from C# via IJSRuntime
+     */
+    window.downloadFile = function(filename, content, mimeType) {
+        const blob = new Blob([content], { type: mimeType || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.style.display = 'none';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        URL.revokeObjectURL(url);
+    };
+
+    /**
+     * Read file content utility function for scene import
+     */
+    window.readFileContent = function(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsText(file);
+        });
+    };
+
     // Keyboard shortcuts
     document.addEventListener('keydown', function(e) {
         // Space - Play/Pause (handled in Blazor)

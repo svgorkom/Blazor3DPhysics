@@ -14,29 +14,62 @@ This codebase follows all five SOLID principles:
 | **I**nterface Segregation | Soft body interfaces split: `IClothPhysicsService`, `IRopePhysicsService`, etc. |
 | **D**ependency Inversion | All components depend on abstractions (interfaces), not concrete implementations |
 
+## Architectural Patterns
+
+| Pattern | Implementation | Purpose |
+|---------|----------------|---------|
+| **CQRS-Lite** | `ICommandDispatcher`, Command Handlers | Separates commands from queries |
+| **Event Aggregator** | `IEventAggregator` | Decoupled component communication |
+| **Result Pattern** | `Result<T>`, `Result` | Functional error handling |
+| **Object Pooling** | `ArrayPool<T>`, `ObjectPool<T>` | Reduces allocations in hot paths |
+| **Factory Pattern** | `IMeshCreatorFactory`, `IMaterialCreatorFactory` | Extensible object creation |
+
 ## High-Level Architecture
 
 ```mermaid
-flowchart LR
-    User -->|UI events| Blazor[Razor Components]
-    Blazor -->|IJSRuntime| Interop[JS Interop Module]
-    Interop --> Rendering[Babylon.js Renderer]
-    Interop --> PhysicsRigid[Rapier.js Rigid Physics]
-    Interop --> PhysicsSoft[Ammo.js Soft Physics]
-    PhysicsRigid -->|Transforms| Rendering
-    PhysicsSoft -->|Deformed Vertices| Rendering
-    Rendering -->|Frame| Canvas[WebGL Canvas]
+flowchart TB
+    subgraph UI["UI Layer"]
+        Pages[Razor Pages]
+        Components[Blazor Components]
+    end
+
+    subgraph Application["Application Layer"]
+        Commands[Command Handlers]
+        Events[Event Aggregator]
+        Validation[Validators]
+    end
+
+    subgraph Domain["Domain Layer"]
+        SceneState[Scene State]
+        Models[Domain Models]
+    end
+
+    subgraph Infrastructure["Infrastructure Layer"]
+        Physics[Physics Services]
+        Rendering[Rendering Service]
+        Interop[JS Interop]
+        Serialization[Serialization]
+        Performance[Performance Monitor]
+    end
+
+    subgraph External["External (JavaScript)"]
+        Babylon[Babylon.js]
+        Rapier[Rapier.js]
+        Ammo[Ammo.js]
+    end
+
+    UI --> Commands
+    UI --> Events
+    Commands --> Domain
+    Commands --> Validation
+    Events --> UI
+    Domain --> Infrastructure
+    Infrastructure --> External
 ```
 
 ## Component Architecture
 
 ### Blazor Layer (C#)
-
-The C# layer handles:
-- UI state management
-- User input processing  
-- Service orchestration
-- Fixed-timestep physics loop
 
 ```
 BlazorClient/
@@ -53,23 +86,30 @@ BlazorClient/
 ?   ??? Factories/
 ?   ?   ??? MeshCreatorFactory.cs    # Extensible mesh creation (OCP)
 ?   ?   ??? MaterialCreatorFactory.cs # Extensible material creation (OCP)
+?   ??? Commands/
+?   ?   ??? CommandInterfaces.cs     # Command/Query definitions
+?   ?   ??? CommandHandlers.cs       # Command handler implementations
+?   ??? Events/
+?   ?   ??? EventAggregator.cs       # Pub/sub event system
+?   ??? Validation/
+?   ?   ??? PhysicsValidator.cs      # Physics parameter validation
 ?   ??? SimulationLoopService.cs  # Physics loop timing only (SRP)
 ?   ??? RenderingService.cs       # Babylon.js wrapper
 ?   ??? PhysicsService.Rigid.cs   # Rapier wrapper (implements IPhysicsService)
 ?   ??? PhysicsService.Soft.cs    # Ammo wrapper (implements segregated interfaces)
 ?   ??? InteropService.cs         # Batched JS calls
 ?   ??? SceneStateService.cs      # Central state
+?   ??? SceneSerializationService.cs # Scene import/export
+?   ??? PerformanceMonitor.cs     # Performance tracking
+?   ??? ObjectPool.cs             # Array/object pooling
+?   ??? JsModuleCache.cs          # JS module caching
 ??? Models/
     ??? PhysicsTypes.cs           # Value types, materials
     ??? SceneObjects.cs           # Entity definitions
+    ??? Result.cs                 # Result pattern types
 ```
 
 ### JavaScript Layer
-
-The JS layer handles:
-- WebGL rendering via Babylon.js
-- Physics simulation via Rapier/Ammo WASM
-- Low-level browser interaction
 
 ```
 wwwroot/js/
@@ -79,11 +119,208 @@ wwwroot/js/
 ??? interop.js         # Bridge with dependency injection (DIP)
 ```
 
+## Command Pattern (CQRS-Lite)
+
+### Command Flow
+
+```mermaid
+sequenceDiagram
+    participant UI as Blazor Component
+    participant Dispatcher as ICommandDispatcher
+    participant Handler as ICommandHandler
+    participant Services as Domain Services
+    participant Events as IEventAggregator
+
+    UI->>Dispatcher: DispatchAsync(command)
+    Dispatcher->>Handler: HandleAsync(command)
+    Handler->>Services: Execute business logic
+    Handler->>Events: Publish domain event
+    Events-->>UI: Event notification
+    Handler-->>Dispatcher: Result<T>
+    Dispatcher-->>UI: Result<T>
+```
+
+### Available Commands
+
+| Command | Handler | Description |
+|---------|---------|-------------|
+| `SpawnRigidBodyCommand` | `SpawnRigidBodyCommandHandler` | Creates a rigid body |
+| `SpawnSoftBodyCommand` | `SpawnSoftBodyCommandHandler` | Creates a soft body |
+| `DeleteObjectCommand` | `DeleteObjectCommandHandler` | Deletes an object |
+| `ResetSceneCommand` | `ResetSceneCommandHandler` | Clears the scene |
+| `SelectObjectCommand` | `SelectObjectCommandHandler` | Selects an object |
+| `ApplyImpulseCommand` | `ApplyImpulseCommandHandler` | Applies force to body |
+| `UpdateSimulationSettingsCommand` | Handler | Updates physics settings |
+| `UpdateRenderSettingsCommand` | Handler | Updates render settings |
+
+## Event Aggregator
+
+### Domain Events
+
+| Event | Published When |
+|-------|----------------|
+| `ObjectSpawnedEvent` | Object created |
+| `ObjectDeletedEvent` | Object deleted |
+| `ObjectSelectedEvent` | Selection changed |
+| `SimulationPausedEvent` | Play/pause toggled |
+| `SimulationSettingsChangedEvent` | Settings updated |
+| `RenderSettingsChangedEvent` | Render settings updated |
+| `PhysicsSteppedEvent` | After each physics step |
+| `SceneResetEvent` | Scene cleared |
+| `SceneLoadedEvent` | Scene imported |
+| `ErrorOccurredEvent` | Error detected |
+
+### Usage Example
+
+```csharp
+// Subscribe to events
+_subscription = _events.Subscribe<ObjectSpawnedEvent>(e => 
+{
+    Console.WriteLine($"Object spawned: {e.Name}");
+});
+
+// Publish events
+_events.Publish(new ObjectSpawnedEvent(body.Id, body.Name, "Sphere"));
+
+// Unsubscribe
+_subscription.Dispose();
+```
+
+## Result Pattern
+
+Functional error handling without exceptions:
+
+```csharp
+// Command returns Result<T>
+var result = await _dispatcher.DispatchAsync<SpawnRigidBodyCommand, string>(command);
+
+// Pattern matching
+result.Match(
+    onSuccess: id => Console.WriteLine($"Created: {id}"),
+    onFailure: error => Console.WriteLine($"Failed: {error}")
+);
+
+// Chaining
+result
+    .OnSuccess(id => UpdateUI(id))
+    .OnFailure(error => ShowError(error));
+
+// Implicit bool conversion
+if (result)
+{
+    // Success path
+}
+```
+
+## Performance Optimization
+
+### Object Pooling
+
+```csharp
+// Rent array from pool
+var array = _transformPool.Rent(1024);
+try
+{
+    // Use array
+    ProcessTransforms(array);
+}
+finally
+{
+    // Return to pool
+    _transformPool.Return(array);
+}
+
+// Or use disposable pattern
+using var pooled = _transformPool.RentDisposable(1024);
+ProcessTransforms(pooled.Array);
+```
+
+### Performance Monitor
+
+```csharp
+// Record timing manually
+_monitor.RecordTiming("Physics", elapsedMs);
+
+// Or use automatic measurement
+using (_monitor.MeasureTiming("Render"))
+{
+    await RenderFrame();
+}
+
+// Get snapshot
+var stats = _monitor.GetSnapshot();
+Console.WriteLine($"FPS: {stats.Fps}, Physics: {stats.PhysicsTimeMs}ms");
+```
+
+### JS Module Cache
+
+```csharp
+// Get cached module reference
+var module = await _moduleCache.GetModuleAsync("./js/physics.rigid.js");
+await module.InvokeVoidAsync("step", deltaTime);
+
+// Preload modules
+await _moduleCache.PreloadModulesAsync(
+    "./js/rendering.js",
+    "./js/physics.rigid.js",
+    "./js/physics.soft.js"
+);
+```
+
+## Validation
+
+### Physics Parameter Validation
+
+```csharp
+var validator = serviceProvider.GetService<IPhysicsValidator>();
+
+var result = validator.ValidateRigidBody(body);
+if (!result.IsValid)
+{
+    foreach (var error in result.Errors)
+        Console.WriteLine($"Error: {error}");
+}
+
+foreach (var warning in result.Warnings)
+    Console.WriteLine($"Warning: {warning}");
+```
+
+### Validated Parameters
+
+- Mass ranges and ratios
+- Scale limits
+- Restitution bounds
+- Damping values
+- Velocity limits
+- Soft body resolution
+- Stiffness vs iterations
+- Pressure settings
+
+## Scene Serialization
+
+### Save/Load Operations
+
+```csharp
+// Save to local storage
+await _serialization.SaveToLocalStorageAsync("MyScene");
+
+// Load from local storage
+var result = await _serialization.LoadFromLocalStorageAsync("MyScene");
+result.OnSuccess(preset => _sceneState.LoadPreset(preset));
+
+// Export to JSON
+var json = await _serialization.ExportToJsonAsync();
+
+// Download as file
+await _serialization.DownloadSceneAsync("scene.json");
+
+// List saved scenes
+var scenes = await _serialization.GetSavedScenesAsync();
+```
+
 ## Service Interfaces (SOLID Compliant)
 
 ### Base Physics Interface (LSP)
-
-All physics services implement this base interface, enabling uniform treatment:
 
 ```csharp
 public interface IPhysicsService
@@ -97,8 +334,6 @@ public interface IPhysicsService
 ```
 
 ### Segregated Soft Body Interfaces (ISP)
-
-Clients depend only on the interfaces they need:
 
 ```csharp
 public interface IClothPhysicsService
@@ -121,64 +356,39 @@ public interface IVertexPinningService
     Task PinVertexAsync(string id, int vertexIndex, Vector3 worldPosition);
     Task UnpinVertexAsync(string id, int vertexIndex);
 }
-
-public interface ISoftBodyVertexDataService
-{
-    Task<Dictionary<string, SoftBodyVertexData>> GetDeformedVerticesAsync();
-    Task<SoftBodyVertexData> GetDeformedVerticesAsync(string id);
-}
 ```
 
-### Simulation Loop Service (SRP)
-
-Extracted from Index.razor to handle only simulation timing:
+## Dependency Injection Setup
 
 ```csharp
-public interface ISimulationLoopService : IAsyncDisposable
-{
-    event Action? OnSimulationStateChanged;
-    float Fps { get; }
-    float PhysicsTimeMs { get; }
-    bool IsRunning { get; }
-    
-    Task StartAsync();
-    Task StopAsync();
-    Task StepOnceAsync();
-}
-```
+// Core services
+builder.Services.AddScoped<IRenderingService, RenderingService>();
+builder.Services.AddScoped<IRigidPhysicsService, RigidPhysicsService>();
+builder.Services.AddScoped<ISoftPhysicsService, SoftPhysicsService>();
+builder.Services.AddScoped<ISceneStateService, SceneStateService>();
 
-## Factory Pattern (OCP)
+// Event Aggregator (singleton for cross-component events)
+builder.Services.AddSingleton<IEventAggregator, EventAggregator>();
 
-### Mesh Creator Factory
+// Command Dispatcher
+builder.Services.AddScoped<ICommandDispatcher, CommandDispatcher>();
 
-Extensible mesh creation without modifying existing code:
+// Command Handlers
+builder.Services.AddScoped<ICommandHandler<SpawnRigidBodyCommand, string>, SpawnRigidBodyCommandHandler>();
+// ... other handlers
 
-```csharp
-public interface IMeshCreator
-{
-    RigidPrimitiveType PrimitiveType { get; }
-    object GetMeshOptions(RigidBody body);
-}
+// Performance & Pooling
+builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();
+builder.Services.AddSingleton<ArrayPool<float>>();
 
-public interface IMeshCreatorFactory
-{
-    IMeshCreator GetCreator(RigidPrimitiveType primitiveType);
-    void RegisterCreator(IMeshCreator creator); // Extend without modification
-}
-```
+// Validation
+builder.Services.AddSingleton<IPhysicsValidator, PhysicsValidator>();
 
-### JavaScript Registry Pattern
+// Serialization
+builder.Services.AddScoped<ISceneSerializationService, SceneSerializationService>();
 
-```javascript
-// OCP - Add new mesh types without modifying createRigidMesh
-const meshCreators = {
-    sphere: (id, scene, options) => BABYLON.MeshBuilder.CreateSphere(id, options, scene),
-    box: (id, scene, options) => BABYLON.MeshBuilder.CreateBox(id, options, scene),
-    // Add new types here without modifying createRigidMesh function
-};
-
-// Register custom creators at runtime
-RenderingModule.registerMeshCreator('custom', myCustomCreator);
+// JS Optimization
+builder.Services.AddScoped<IJsModuleCache, JsModuleCache>();
 ```
 
 ## Data Flow
@@ -189,211 +399,68 @@ RenderingModule.registerMeshCreator('custom', myCustomCreator);
 sequenceDiagram
     participant Timer as Timer (60 Hz)
     participant Loop as SimulationLoopService
+    participant Monitor as PerformanceMonitor
     participant Rigid as IRigidPhysicsService
     participant Soft as ISoftPhysicsService
-    participant Interop as IInteropService
+    participant Events as IEventAggregator
 
     Timer->>Loop: Tick
+    Loop->>Monitor: MeasureTiming("Frame")
     Loop->>Loop: Accumulate deltaTime
     
     loop While accumulator >= fixedDt
+        Loop->>Monitor: MeasureTiming("Physics")
         Loop->>Rigid: StepAsync(fixedDt)
         Loop->>Soft: StepAsync(fixedDt)
         Loop->>Loop: accumulator -= fixedDt
     end
     
+    Loop->>Monitor: MeasureTiming("Interop")
     Loop->>Rigid: GetTransformBatchAsync()
-    Rigid-->>Loop: RigidTransformBatch
-    
     Loop->>Soft: GetDeformedVerticesAsync()
-    Soft-->>Loop: Dictionary<string, SoftBodyVertexData>
     
-    Loop->>Interop: CommitRigidTransformsAsync()
-    Loop->>Interop: CommitSoftVerticesAsync()
-    
-    Loop->>Loop: OnSimulationStateChanged?.Invoke()
-```
-
-### Fixed Timestep Accumulator
-
-The physics loop uses a fixed timestep with an accumulator to ensure deterministic simulation:
-
-```csharp
-float accumulator = 0;
-const float fixedDt = 1f / 120f;
-
-void Update(float deltaTime)
-{
-    accumulator += deltaTime * timeScale;
-    
-    while (accumulator >= fixedDt)
-    {
-        PhysicsStep(fixedDt);
-        accumulator -= fixedDt;
-    }
-    
-    // Optional: interpolate for rendering
-    float alpha = accumulator / fixedDt;
-}
-```
-
-## Dependency Injection Setup
-
-All services are registered with proper abstractions (DIP):
-
-```csharp
-// Core services
-builder.Services.AddScoped<IRenderingService, RenderingService>();
-builder.Services.AddScoped<IRigidPhysicsService, RigidPhysicsService>();
-builder.Services.AddScoped<ISoftPhysicsService, SoftPhysicsService>();
-builder.Services.AddScoped<IInteropService, InteropService>();
-builder.Services.AddScoped<ISceneStateService, SceneStateService>();
-
-// Simulation loop (SRP)
-builder.Services.AddScoped<ISimulationLoopService, SimulationLoopService>();
-
-// Factories (OCP)
-builder.Services.AddSingleton<IMeshCreatorFactory, MeshCreatorFactory>();
-builder.Services.AddSingleton<IMaterialCreatorFactory, MaterialCreatorFactory>();
-
-// Segregated interfaces (ISP) - same implementation, different interfaces
-builder.Services.AddScoped<IClothPhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
-builder.Services.AddScoped<IRopePhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
-builder.Services.AddScoped<IVolumetricPhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
-```
-
-## Interop Batching Strategy
-
-To minimize JS interop overhead, we batch updates:
-
-### Transform Batching
-```javascript
-// Single interop call with typed array
-function updateRigidTransforms(transforms, ids) {
-    // transforms: Float32Array [px,py,pz,rx,ry,rz,rw, ...]
-    // ids: string[]
-    const stride = 7;
-    for (let i = 0; i < ids.length; i++) {
-        updateMesh(ids[i], transforms.subarray(i*stride, (i+1)*stride));
-    }
-}
-```
-
-### Vertex Double-Buffering
-For soft bodies, we double-buffer vertex data to avoid allocation:
-
-```csharp
-private readonly Dictionary<string, float[]> _bufferA = new();
-private readonly Dictionary<string, float[]> _bufferB = new();
-private bool _useBufferA = true;
-
-async Task CommitSoftVerticesAsync(string id, float[] vertices)
-{
-    var buffer = _useBufferA ? _bufferA : _bufferB;
-    if (!buffer.TryGetValue(id, out var arr) || arr.Length != vertices.Length)
-    {
-        buffer[id] = new float[vertices.Length];
-    }
-    Array.Copy(vertices, buffer[id], vertices.Length);
-    await _jsRuntime.InvokeVoidAsync("updateVertices", id, buffer[id]);
-}
-```
-
-## State Management
-
-### SceneStateService
-
-Central state management with change notifications:
-
-```csharp
-public class SceneStateService
-{
-    private readonly List<RigidBody> _rigidBodies = new();
-    private readonly List<SoftBody> _softBodies = new();
-    
-    public event Action? OnStateChanged;
-    
-    public IReadOnlyList<RigidBody> RigidBodies => _rigidBodies;
-    public IReadOnlyList<SoftBody> SoftBodies => _softBodies;
-    
-    public void AddRigidBody(RigidBody body)
-    {
-        _rigidBodies.Add(body);
-        OnStateChanged?.Invoke();
-    }
-}
-```
-
-## Initialization Sequence
-
-```mermaid
-sequenceDiagram
-    participant App as Index.razor
-    participant Int as IInteropService
-    participant Rnd as IRenderingService
-    participant Rig as IRigidPhysicsService
-    participant Sft as ISoftPhysicsService
-    participant Loop as ISimulationLoopService
-
-    App->>Int: InitializeAsync("canvas")
-    Int->>Int: Setup performance monitoring
-    
-    App->>Rnd: InitializeAsync("canvas", settings)
-    Rnd->>Rnd: Create Babylon engine/scene
-    Rnd->>Rnd: Setup camera, lights, ground
-    
-    App->>Rig: InitializeAsync(settings)
-    Rig->>Rig: Load Rapier WASM
-    Rig->>Rig: Create physics world
-    Rig->>Rig: Create ground collider
-    
-    App->>Sft: InitializeAsync(settings)
-    Sft->>Sft: Load Ammo WASM
-    Sft->>Sft: Create soft body world
-    Sft-->>App: isAvailable
-    
-    App->>Loop: StartAsync()
-    Loop->>Loop: Start PeriodicTimer
+    Loop->>Events: Publish(PhysicsSteppedEvent)
+    Loop->>Loop: OnSimulationStateChanged()
 ```
 
 ## Error Handling
 
-### Fallback Strategy
+### Result-Based Error Handling
 
-If soft body physics fails to initialize:
-1. `SoftPhysicsService.IsAvailableAsync()` returns `false`
-2. UI disables soft body spawn buttons
-3. Warning indicator shown to user
-4. Rigid body physics continues normally
+```csharp
+var result = await _dispatcher.DispatchAsync<SpawnRigidBodyCommand, string>(command);
+
+if (result.IsFailure)
+{
+    _events.Publish(new ErrorOccurredEvent(
+        "Failed to spawn object",
+        result.Error,
+        ErrorSeverity.Warning));
+}
+```
 
 ### Graceful Degradation
 
 ```csharp
-public async Task InitializeSoftPhysicsAsync()
+try
 {
-    try
-    {
-        await SoftPhysics.InitializeAsync(Settings);
-        _softBodyAvailable = await SoftPhysics.IsAvailableAsync();
-    }
-    catch (Exception ex)
-    {
-        Console.Error.WriteLine($"Soft physics unavailable: {ex.Message}");
-        _softBodyAvailable = false;
-    }
+    await SoftPhysics.InitializeAsync(Settings);
+    _softBodyAvailable = await SoftPhysics.IsAvailableAsync();
+}
+catch (Exception ex)
+{
+    _events.Publish(new ErrorOccurredEvent(
+        "Soft physics unavailable",
+        ex.Message,
+        ErrorSeverity.Warning));
+    _softBodyAvailable = false;
 }
 ```
 
-## Thread Safety
-
-Blazor WASM is single-threaded, but we use async patterns:
-- Timer callbacks are marshaled to UI thread
-- `InvokeAsync` ensures UI updates on correct context
-- No explicit locking needed in WASM environment
-
 ## Memory Management
 
-- Object pooling for frequently allocated types
-- Reuse typed arrays for batched transfers
-- Dispose pattern for JS module references
-- Manual cleanup of physics bodies on removal
+- **Object Pooling**: `ArrayPool<float>` for transform arrays
+- **Result Pattern**: Stack-allocated structs avoid heap allocation
+- **Circular Buffers**: Performance monitor uses fixed-size buffers
+- **Dispose Pattern**: All services implement `IAsyncDisposable`
+- **Event Cleanup**: Subscriptions are disposable for automatic cleanup
