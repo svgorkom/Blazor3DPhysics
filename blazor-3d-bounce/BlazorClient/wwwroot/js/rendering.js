@@ -19,6 +19,7 @@
     let shadowGenerator = null;
     let meshes = new Map();
     let softMeshes = new Map();
+    let softMeshData = new Map(); // Store original mesh data for rebuilding
     let settings = {};
 
     /**
@@ -103,6 +104,107 @@
     };
 
     /**
+     * Soft mesh creator registry (OCP - extensible without modification)
+     */
+    const softMeshCreators = {
+        cloth: function(id, scene, data) {
+            const width = data.width || 2;
+            const height = data.height || 2;
+            const resX = data.resolutionX || 20;
+            const resY = data.resolutionY || 20;
+            
+            // Create a ground mesh that matches Ammo.js cloth vertex layout
+            const mesh = BABYLON.MeshBuilder.CreateGround(id, {
+                width: width,
+                height: height,
+                subdivisions: Math.max(resX, resY),
+                updatable: true
+            }, scene);
+            
+            // Rotate to match Ammo.js orientation (vertical cloth)
+            mesh.rotation.x = -Math.PI / 2;
+            
+            return mesh;
+        },
+        
+        rope: function(id, scene, data) {
+            const length = data.length || 5;
+            const segments = data.segments || 20;
+            const segmentLength = length / segments;
+            
+            // Create initial path for rope
+            const path = [];
+            for (let i = 0; i <= segments; i++) {
+                path.push(new BABYLON.Vector3(0, -i * segmentLength, 0));
+            }
+            
+            const mesh = BABYLON.MeshBuilder.CreateTube(id, {
+                path: path,
+                radius: data.radius || 0.02,
+                tessellation: 8,
+                updatable: true,
+                sideOrientation: BABYLON.Mesh.DOUBLESIDE
+            }, scene);
+            
+            return mesh;
+        },
+        
+        volumetric: function(id, scene, data) {
+            const radius = data.radius || 0.5;
+            
+            // Create sphere with enough segments for deformation
+            const mesh = BABYLON.MeshBuilder.CreateSphere(id, {
+                diameter: radius * 2,
+                segments: data.resolutionX || 12,
+                updatable: true
+            }, scene);
+            
+            return mesh;
+        }
+    };
+
+    /**
+     * Soft material creator registry
+     */
+    const softMaterialCreators = {
+        cloth: function(id, scene, data) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.2, 0.5, 0.8);
+            material.metallic = 0.0;
+            material.roughness = 0.8;
+            material.backFaceCulling = false;
+            material.twoSidedLighting = true;
+            return material;
+        },
+        
+        rope: function(id, scene, data) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.6, 0.4, 0.2);
+            material.metallic = 0.0;
+            material.roughness = 0.9;
+            return material;
+        },
+        
+        volumetric: function(id, scene, data) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.8, 0.3, 0.3);
+            material.metallic = 0.0;
+            material.roughness = 0.4;
+            material.alpha = 0.9;
+            return material;
+        },
+        
+        default: function(id, scene, data) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.2, 0.6, 0.8);
+            material.metallic = 0.0;
+            material.roughness = 0.6;
+            material.backFaceCulling = false;
+            return material;
+        }
+    };
+
+    /**
      * Initialize the Babylon.js rendering engine
      */
     window.RenderingModule = {
@@ -122,6 +224,20 @@
          */
         registerMaterialCreator: function(preset, creator) {
             materialCreators[preset.toLowerCase()] = creator;
+        },
+
+        /**
+         * Register a custom soft mesh creator (OCP - extend without modification)
+         */
+        registerSoftMeshCreator: function(type, creator) {
+            softMeshCreators[type.toLowerCase()] = creator;
+        },
+
+        /**
+         * Register a custom soft material creator (OCP - extend without modification)
+         */
+        registerSoftMaterialCreator: function(type, creator) {
+            softMaterialCreators[type.toLowerCase()] = creator;
         },
 
         initialize: async function(canvasId, renderSettings) {
@@ -373,48 +489,13 @@
         },
 
         createSoftMesh: function(data) {
-            let mesh;
-
-            switch (data.type) {
-                case 'cloth':
-                    mesh = BABYLON.MeshBuilder.CreateGround(data.id, {
-                        width: data.width || 2,
-                        height: data.height || 2,
-                        subdivisions: Math.max(data.resolutionX || 20, data.resolutionY || 20),
-                        updatable: true
-                    }, scene);
-                    break;
-
-                case 'rope':
-                    const path = [];
-                    const segmentLength = (data.length || 5) / (data.segments || 20);
-                    for (let i = 0; i <= (data.segments || 20); i++) {
-                        path.push(new BABYLON.Vector3(0, -i * segmentLength, 0));
-                    }
-                    mesh = BABYLON.MeshBuilder.CreateTube(data.id, {
-                        path: path,
-                        radius: 0.02,
-                        tessellation: 8,
-                        updatable: true
-                    }, scene);
-                    break;
-
-                case 'volumetric':
-                    mesh = BABYLON.MeshBuilder.CreateSphere(data.id, {
-                        diameter: (data.radius || 0.5) * 2,
-                        segments: 16,
-                        updatable: true
-                    }, scene);
-                    break;
-
-                default:
-                    mesh = BABYLON.MeshBuilder.CreateGround(data.id, {
-                        width: 2,
-                        height: 2,
-                        subdivisions: 20,
-                        updatable: true
-                    }, scene);
-            }
+            console.log('Creating soft mesh:', data.id, data.type);
+            
+            const type = (data.type || 'cloth').toLowerCase();
+            
+            // Use registry to create mesh (OCP compliant)
+            const meshCreator = softMeshCreators[type] || softMeshCreators.cloth;
+            const mesh = meshCreator(data.id, scene, data);
 
             // Apply position
             if (data.position) {
@@ -425,13 +506,9 @@
                 );
             }
 
-            // Create soft body material
-            const material = new BABYLON.PBRMaterial(data.id + "_mat", scene);
-            material.albedoColor = new BABYLON.Color3(0.2, 0.6, 0.8);
-            material.metallic = 0.0;
-            material.roughness = 0.6;
-            material.backFaceCulling = false;
-            mesh.material = material;
+            // Use registry for material (OCP compliant)
+            const materialCreator = softMaterialCreators[type] || softMaterialCreators.default;
+            mesh.material = materialCreator(data.id, scene, data);
 
             // Enable shadows
             if (shadowGenerator) {
@@ -439,9 +516,20 @@
                 mesh.receiveShadows = true;
             }
 
+            // Store mesh and its data
             softMeshes.set(data.id, mesh);
+            softMeshData.set(data.id, {
+                type: type,
+                originalData: data,
+                vertexCount: mesh.getTotalVertices()
+            });
+
+            console.log('Soft mesh created:', data.id, 'vertices:', mesh.getTotalVertices());
         },
 
+        /**
+         * Update mesh transform
+         */
         updateMeshTransform: function(id, position, rotation, scale) {
             const mesh = meshes.get(id);
             if (!mesh) return;
@@ -469,19 +557,178 @@
             }
         },
 
+        /**
+         * Update soft mesh vertices from physics simulation
+         */
         updateSoftMeshVertices: function(id, vertices, normals) {
             const mesh = softMeshes.get(id);
-            if (!mesh) return;
+            if (!mesh) {
+                console.warn('Soft mesh not found:', id);
+                return;
+            }
 
-            mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, vertices);
+            const meshData = softMeshData.get(id);
+            if (!meshData) return;
 
-            if (normals) {
-                mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, normals);
+            try {
+                // For cloth, we need to handle the vertex mapping
+                if (meshData.type === 'cloth') {
+                    this._updateClothVertices(mesh, vertices, normals);
+                } else if (meshData.type === 'rope') {
+                    this._updateRopeVertices(mesh, vertices, meshData.originalData);
+                } else if (meshData.type === 'volumetric') {
+                    this._updateVolumetricVertices(mesh, vertices, normals);
+                } else {
+                    // Generic update
+                    mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(vertices));
+                    if (normals && normals.length > 0) {
+                        mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(normals));
+                    }
+                }
+            } catch (e) {
+                console.error('Error updating soft mesh vertices:', id, e);
+            }
+        },
+
+        /**
+         * Update cloth mesh vertices
+         */
+        _updateClothVertices: function(mesh, vertices, normals) {
+            const currentPositions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+            if (!currentPositions) return;
+
+            // Map Ammo.js vertices to Babylon.js mesh vertices
+            // Ammo.js cloth has (resX+1) * (resY+1) vertices
+            // Babylon.js ground has similar structure but may have different ordering
+            
+            const physicsVertexCount = vertices.length / 3;
+            const meshVertexCount = currentPositions.length / 3;
+
+            if (physicsVertexCount === meshVertexCount) {
+                // Direct mapping
+                mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(vertices));
             } else {
+                // Need to interpolate or map vertices
+                // For now, update what we can
+                const updateCount = Math.min(physicsVertexCount, meshVertexCount);
+                const newPositions = new Float32Array(currentPositions.length);
+                
+                for (let i = 0; i < updateCount * 3; i++) {
+                    newPositions[i] = vertices[i];
+                }
+                // Keep remaining vertices unchanged
+                for (let i = updateCount * 3; i < currentPositions.length; i++) {
+                    newPositions[i] = currentPositions[i];
+                }
+                
+                mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, newPositions);
+            }
+
+            // Update normals
+            if (normals && normals.length > 0) {
+                mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(normals));
+            } else {
+                // Recompute normals
                 const indices = mesh.getIndices();
+                const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
                 const computedNormals = [];
-                BABYLON.VertexData.ComputeNormals(vertices, indices, computedNormals);
-                mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, computedNormals);
+                BABYLON.VertexData.ComputeNormals(positions, indices, computedNormals);
+                mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(computedNormals));
+            }
+        },
+
+        /**
+         * Update rope mesh by rebuilding the tube path
+         */
+        _updateRopeVertices: function(mesh, vertices, originalData) {
+            // Rope needs to be rebuilt with new path
+            const vertexCount = vertices.length / 3;
+            const path = [];
+
+            for (let i = 0; i < vertexCount; i++) {
+                path.push(new BABYLON.Vector3(
+                    vertices[i * 3],
+                    vertices[i * 3 + 1],
+                    vertices[i * 3 + 2]
+                ));
+            }
+
+            // Update tube with new path
+            if (path.length >= 2) {
+                mesh = BABYLON.MeshBuilder.CreateTube(null, {
+                    path: path,
+                    radius: originalData.radius || 0.02,
+                    tessellation: 8,
+                    instance: mesh
+                });
+            }
+        },
+
+        /**
+         * Update volumetric mesh vertices
+         */
+        _updateVolumetricVertices: function(mesh, vertices, normals) {
+            const currentPositions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+            if (!currentPositions) return;
+
+            const physicsVertexCount = vertices.length / 3;
+            const meshVertexCount = currentPositions.length / 3;
+
+            // Volumetric bodies may have different vertex counts
+            // Use center of mass offset for simple translation
+            if (physicsVertexCount !== meshVertexCount) {
+                // Calculate center of physics body
+                let cx = 0, cy = 0, cz = 0;
+                for (let i = 0; i < physicsVertexCount; i++) {
+                    cx += vertices[i * 3];
+                    cy += vertices[i * 3 + 1];
+                    cz += vertices[i * 3 + 2];
+                }
+                cx /= physicsVertexCount;
+                cy /= physicsVertexCount;
+                cz /= physicsVertexCount;
+
+                // Move mesh to center
+                mesh.position.set(cx, cy, cz);
+                
+                // Scale based on bounding radius
+                let maxDist = 0;
+                for (let i = 0; i < physicsVertexCount; i++) {
+                    const dx = vertices[i * 3] - cx;
+                    const dy = vertices[i * 3 + 1] - cy;
+                    const dz = vertices[i * 3 + 2] - cz;
+                    maxDist = Math.max(maxDist, Math.sqrt(dx*dx + dy*dy + dz*dz));
+                }
+                
+                const originalRadius = mesh.getBoundingInfo().boundingSphere.radius;
+                if (originalRadius > 0 && maxDist > 0) {
+                    const scale = maxDist / originalRadius;
+                    mesh.scaling.setAll(scale);
+                }
+            } else {
+                // Direct vertex update
+                mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(vertices));
+                
+                if (normals && normals.length > 0) {
+                    mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(normals));
+                } else {
+                    const indices = mesh.getIndices();
+                    const computedNormals = [];
+                    BABYLON.VertexData.ComputeNormals(vertices, indices, computedNormals);
+                    mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(computedNormals));
+                }
+            }
+        },
+
+        /**
+         * Batch update multiple soft meshes (performance optimization)
+         */
+        updateAllSoftMeshVertices: function(vertexDataMap) {
+            for (const id in vertexDataMap) {
+                const data = vertexDataMap[id];
+                if (data && data.vertices && data.vertices.length > 0) {
+                    this.updateSoftMeshVertices(id, data.vertices, data.normals);
+                }
             }
         },
 
@@ -497,6 +744,7 @@
             if (mesh) {
                 mesh.dispose();
                 softMeshes.delete(id);
+                softMeshData.delete(id);
             }
         },
 
@@ -570,6 +818,7 @@
             }
             meshes.clear();
             softMeshes.clear();
+            softMeshData.clear();
         }
     };
 

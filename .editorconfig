@@ -1,0 +1,65 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# All files
+[*]
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Markdown files
+[*.md]
+charset = utf-8
+trim_trailing_whitespace = false
+insert_final_newline = true
+
+# C# files
+[*.cs]
+charset = utf-8
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+# Razor files
+[*.razor]
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+# JSON files
+[*.json]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+# JavaScript/TypeScript files
+[*.{js,ts}]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+# HTML files
+[*.html]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+# CSS files
+[*.css]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+# XML files
+[*.{xml,csproj,props,targets}]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+# YAML files
+[*.{yml,yaml}]
+charset = utf-8
+indent_style = space
+indent_size = 2

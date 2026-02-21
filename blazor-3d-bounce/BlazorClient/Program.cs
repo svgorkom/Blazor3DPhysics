@@ -52,9 +52,18 @@ builder.Services.AddSingleton<IEventAggregator, EventAggregator>();
 
 #endregion
 
-#region Command Dispatcher (CQRS-lite pattern)
+#region Command Dispatcher (CQRS-lite pattern with logging)
 
-builder.Services.AddScoped<ICommandDispatcher, CommandDispatcher>();
+// Register the base dispatcher
+builder.Services.AddScoped<CommandDispatcher>();
+
+// Register the logging decorator as the primary ICommandDispatcher
+builder.Services.AddScoped<ICommandDispatcher>(sp =>
+{
+    var baseDispatcher = sp.GetRequiredService<CommandDispatcher>();
+    var performanceMonitor = sp.GetRequiredService<IPerformanceMonitor>();
+    return new LoggingCommandDispatcher(baseDispatcher, performanceMonitor);
+});
 
 // Command handlers
 builder.Services.AddScoped<ICommandHandler<SpawnRigidBodyCommand, string>, SpawnRigidBodyCommandHandler>();
@@ -70,7 +79,37 @@ builder.Services.AddScoped<ICommandHandler<UpdateRenderSettingsCommand>, UpdateR
 
 #region Performance & Monitoring
 
-builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();
+// Configure performance monitor with options
+builder.Services.AddSingleton<IPerformanceMonitor>(sp =>
+{
+    var options = new PerformanceMonitorOptions
+    {
+        DetailedProfilingEnabled = false, // Enable in dev if needed
+        SampleCount = 60,
+        FpsWindowMs = 1000,
+        TrackMemory = true,
+        TrackGarbageCollection = true,
+        LogPerformanceWarnings = true,
+        FpsWarningThreshold = 30f,
+        FrameTimeWarningThresholdMs = 33f
+    };
+    return new PerformanceMonitor(options);
+});
+
+#endregion
+
+#region Rate Limiting (DoS protection)
+
+builder.Services.AddSingleton<IRateLimiter>(sp =>
+{
+    var options = new RateLimiterOptions
+    {
+        MaxRequests = 100, // 100 requests per window
+        Window = TimeSpan.FromMinutes(1),
+        MaxConcurrent = 10 // Max 10 concurrent operations
+    };
+    return new RateLimiter(options);
+});
 
 #endregion
 

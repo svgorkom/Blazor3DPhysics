@@ -1,5 +1,6 @@
 using BlazorClient.Models;
 using BlazorClient.Services.Events;
+using BlazorClient.Services.Validation;
 
 namespace BlazorClient.Services.Commands;
 
@@ -12,21 +13,35 @@ public class SpawnRigidBodyCommandHandler : ICommandHandler<SpawnRigidBodyComman
     private readonly IRigidPhysicsService _rigidPhysics;
     private readonly IRenderingService _rendering;
     private readonly IEventAggregator _events;
+    private readonly IPhysicsValidator _validator;
+    private readonly IRateLimiter _rateLimiter;
 
     public SpawnRigidBodyCommandHandler(
         ISceneStateService sceneState,
         IRigidPhysicsService rigidPhysics,
         IRenderingService rendering,
-        IEventAggregator events)
+        IEventAggregator events,
+        IPhysicsValidator validator,
+        IRateLimiter rateLimiter)
     {
         _sceneState = sceneState;
         _rigidPhysics = rigidPhysics;
         _rendering = rendering;
         _events = events;
+        _validator = validator;
+        _rateLimiter = rateLimiter;
     }
 
     public async Task<Result<string>> HandleAsync(SpawnRigidBodyCommand command, CancellationToken cancellationToken = default)
     {
+        // Check rate limit
+        if (!_rateLimiter.TryAcquire("spawn_rigid"))
+        {
+            var remaining = _rateLimiter.GetRemainingQuota("spawn_rigid");
+            return Result<string>.Failure(
+                $"Rate limit exceeded for rigid body spawning. Remaining quota: {remaining}. Please try again later.");
+        }
+
         try
         {
             var body = new RigidBody(command.Type, command.Material)
@@ -37,6 +52,29 @@ public class SpawnRigidBodyCommandHandler : ICommandHandler<SpawnRigidBodyComman
                     Scale = command.Scale ?? Vector3.One
                 }
             };
+
+            // Validate the rigid body before creation
+            var validation = _validator.ValidateRigidBody(body);
+            
+            if (!validation.IsValid)
+            {
+                var errorMessage = string.Join("; ", validation.Errors);
+                _events.Publish(new ErrorOccurredEvent(
+                    "Rigid body validation failed",
+                    errorMessage,
+                    ErrorSeverity.Error));
+                return Result<string>.Failure(errorMessage);
+            }
+
+            // Log warnings to console
+            foreach (var warning in validation.Warnings)
+            {
+                Console.WriteLine($"[Warning] Rigid body spawn: {warning}");
+                _events.Publish(new ErrorOccurredEvent(
+                    "Rigid body validation warning",
+                    warning,
+                    ErrorSeverity.Warning));
+            }
 
             _sceneState.AddRigidBody(body);
             await _rigidPhysics.CreateRigidBodyAsync(body);
@@ -62,21 +100,35 @@ public class SpawnSoftBodyCommandHandler : ICommandHandler<SpawnSoftBodyCommand,
     private readonly ISoftPhysicsService _softPhysics;
     private readonly IRenderingService _rendering;
     private readonly IEventAggregator _events;
+    private readonly IPhysicsValidator _validator;
+    private readonly IRateLimiter _rateLimiter;
 
     public SpawnSoftBodyCommandHandler(
         ISceneStateService sceneState,
         ISoftPhysicsService softPhysics,
         IRenderingService rendering,
-        IEventAggregator events)
+        IEventAggregator events,
+        IPhysicsValidator validator,
+        IRateLimiter rateLimiter)
     {
         _sceneState = sceneState;
         _softPhysics = softPhysics;
         _rendering = rendering;
         _events = events;
+        _validator = validator;
+        _rateLimiter = rateLimiter;
     }
 
     public async Task<Result<string>> HandleAsync(SpawnSoftBodyCommand command, CancellationToken cancellationToken = default)
     {
+        // Check rate limit
+        if (!_rateLimiter.TryAcquire("spawn_soft"))
+        {
+            var remaining = _rateLimiter.GetRemainingQuota("spawn_soft");
+            return Result<string>.Failure(
+                $"Rate limit exceeded for soft body spawning. Remaining quota: {remaining}. Please try again later.");
+        }
+
         try
         {
             if (!await _softPhysics.IsAvailableAsync())
@@ -101,6 +153,29 @@ public class SpawnSoftBodyCommandHandler : ICommandHandler<SpawnSoftBodyCommand,
             else if (command.Type == SoftBodyType.Rope)
             {
                 body.PinnedVertices.Add(0);
+            }
+
+            // Validate the soft body before creation
+            var validation = _validator.ValidateSoftBody(body);
+            
+            if (!validation.IsValid)
+            {
+                var errorMessage = string.Join("; ", validation.Errors);
+                _events.Publish(new ErrorOccurredEvent(
+                    "Soft body validation failed",
+                    errorMessage,
+                    ErrorSeverity.Error));
+                return Result<string>.Failure(errorMessage);
+            }
+
+            // Log warnings to console
+            foreach (var warning in validation.Warnings)
+            {
+                Console.WriteLine($"[Warning] Soft body spawn: {warning}");
+                _events.Publish(new ErrorOccurredEvent(
+                    "Soft body validation warning",
+                    warning,
+                    ErrorSeverity.Warning));
             }
 
             _sceneState.AddSoftBody(body);
@@ -305,23 +380,49 @@ public class UpdateSimulationSettingsCommandHandler : ICommandHandler<UpdateSimu
     private readonly IRigidPhysicsService _rigidPhysics;
     private readonly ISoftPhysicsService _softPhysics;
     private readonly IEventAggregator _events;
+    private readonly IPhysicsValidator _validator;
 
     public UpdateSimulationSettingsCommandHandler(
         ISceneStateService sceneState,
         IRigidPhysicsService rigidPhysics,
         ISoftPhysicsService softPhysics,
-        IEventAggregator events)
+        IEventAggregator events,
+        IPhysicsValidator validator)
     {
         _sceneState = sceneState;
         _rigidPhysics = rigidPhysics;
         _softPhysics = softPhysics;
         _events = events;
+        _validator = validator;
     }
 
     public async Task<Result> HandleAsync(UpdateSimulationSettingsCommand command, CancellationToken cancellationToken = default)
     {
         try
         {
+            // Validate simulation settings
+            var validation = _validator.ValidateSimulationSettings(command.Settings);
+            
+            if (!validation.IsValid)
+            {
+                var errorMessage = string.Join("; ", validation.Errors);
+                _events.Publish(new ErrorOccurredEvent(
+                    "Simulation settings validation failed",
+                    errorMessage,
+                    ErrorSeverity.Error));
+                return Result.Failure(errorMessage);
+            }
+
+            // Log warnings
+            foreach (var warning in validation.Warnings)
+            {
+                Console.WriteLine($"[Warning] Simulation settings: {warning}");
+                _events.Publish(new ErrorOccurredEvent(
+                    "Simulation settings warning",
+                    warning,
+                    ErrorSeverity.Warning));
+            }
+
             _sceneState.UpdateSettings(command.Settings);
             await _rigidPhysics.UpdateSettingsAsync(command.Settings);
             await _softPhysics.UpdateSettingsAsync(command.Settings);

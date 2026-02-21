@@ -3,6 +3,52 @@ using System.Diagnostics;
 namespace BlazorClient.Services;
 
 /// <summary>
+/// Configuration options for performance monitoring.
+/// </summary>
+public class PerformanceMonitorOptions
+{
+    /// <summary>
+    /// Whether detailed profiling is enabled.
+    /// </summary>
+    public bool DetailedProfilingEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Number of samples to keep for averaging.
+    /// </summary>
+    public int SampleCount { get; set; } = 60;
+
+    /// <summary>
+    /// FPS calculation window in milliseconds.
+    /// </summary>
+    public int FpsWindowMs { get; set; } = 1000;
+
+    /// <summary>
+    /// Whether to track memory usage.
+    /// </summary>
+    public bool TrackMemory { get; set; } = true;
+
+    /// <summary>
+    /// Whether to track GC collections.
+    /// </summary>
+    public bool TrackGarbageCollection { get; set; } = true;
+
+    /// <summary>
+    /// Whether to log performance warnings.
+    /// </summary>
+    public bool LogPerformanceWarnings { get; set; } = true;
+
+    /// <summary>
+    /// Threshold for FPS warnings (below this value triggers warning).
+    /// </summary>
+    public float FpsWarningThreshold { get; set; } = 30f;
+
+    /// <summary>
+    /// Threshold for frame time warnings in milliseconds.
+    /// </summary>
+    public float FrameTimeWarningThresholdMs { get; set; } = 33f; // ~30 FPS
+}
+
+/// <summary>
 /// Performance snapshot containing current metrics.
 /// </summary>
 public record PerformanceSnapshot(
@@ -60,6 +106,11 @@ public interface IPerformanceMonitor
     /// Resets all recorded metrics.
     /// </summary>
     void Reset();
+
+    /// <summary>
+    /// Gets the current configuration options.
+    /// </summary>
+    PerformanceMonitorOptions Options { get; }
 }
 
 /// <summary>
@@ -67,9 +118,7 @@ public interface IPerformanceMonitor
 /// </summary>
 public class PerformanceMonitor : IPerformanceMonitor
 {
-    private const int SampleCount = 60; // Keep last 60 samples for averaging
-    private const int FpsWindowMs = 1000; // Calculate FPS over 1 second
-
+    private readonly PerformanceMonitorOptions _options;
     private readonly Dictionary<string, CircularBuffer<float>> _timings = new();
     private readonly object _lock = new();
 
@@ -85,12 +134,27 @@ public class PerformanceMonitor : IPerformanceMonitor
     // GC tracking
     private int _lastGcCount;
 
-    public bool DetailedProfilingEnabled { get; set; }
+    public bool DetailedProfilingEnabled 
+    { 
+        get => _options.DetailedProfilingEnabled; 
+        set => _options.DetailedProfilingEnabled = value; 
+    }
 
-    public PerformanceMonitor()
+    public PerformanceMonitorOptions Options => _options;
+
+    public PerformanceMonitor() : this(new PerformanceMonitorOptions())
     {
+    }
+
+    public PerformanceMonitor(PerformanceMonitorOptions options)
+    {
+        _options = options ?? new PerformanceMonitorOptions();
         _lastFpsCalculation = Stopwatch.GetTimestamp();
-        _lastGcCount = GC.CollectionCount(0);
+        
+        if (_options.TrackGarbageCollection)
+        {
+            _lastGcCount = GC.CollectionCount(0);
+        }
 
         // Pre-create common categories
         GetOrCreateBuffer("Physics");
@@ -100,13 +164,24 @@ public class PerformanceMonitor : IPerformanceMonitor
     }
 
     /// <inheritdoc />
-    public void RecordTiming(string category, float milliseconds
-    )
+    public void RecordTiming(string category, float milliseconds)
     {
+        if (!DetailedProfilingEnabled && category != "Frame" && category != "Physics")
+        {
+            // Skip recording for non-essential categories when profiling is disabled
+            return;
+        }
+
         var buffer = GetOrCreateBuffer(category);
         lock (_lock)
         {
             buffer.Add(milliseconds);
+        }
+
+        // Log performance warnings if enabled
+        if (_options.LogPerformanceWarnings)
+        {
+            CheckPerformanceWarnings(category, milliseconds);
         }
     }
 
@@ -131,7 +206,17 @@ public class PerformanceMonitor : IPerformanceMonitor
     /// <inheritdoc />
     public PerformanceSnapshot GetSnapshot()
     {
-        var gcCount = GC.CollectionCount(0) - _lastGcCount;
+        var gcCount = 0;
+        if (_options.TrackGarbageCollection)
+        {
+            gcCount = GC.CollectionCount(0) - _lastGcCount;
+        }
+
+        var memoryUsed = 0L;
+        if (_options.TrackMemory)
+        {
+            memoryUsed = GC.GetTotalMemory(false);
+        }
 
         return new PerformanceSnapshot(
             Fps: _currentFps,
@@ -141,7 +226,7 @@ public class PerformanceMonitor : IPerformanceMonitor
             InteropTimeMs: GetAverageTiming("Interop"),
             RigidBodyCount: _rigidBodyCount,
             SoftBodyCount: _softBodyCount,
-            MemoryUsedBytes: GC.GetTotalMemory(false),
+            MemoryUsedBytes: memoryUsed,
             GcCollections: gcCount
         );
     }
@@ -161,11 +246,17 @@ public class PerformanceMonitor : IPerformanceMonitor
         var now = Stopwatch.GetTimestamp();
         var elapsed = (now - _lastFpsCalculation) * 1000.0 / Stopwatch.Frequency;
 
-        if (elapsed >= FpsWindowMs)
+        if (elapsed >= _options.FpsWindowMs)
         {
             _currentFps = (float)(_frameCount * 1000.0 / elapsed);
             _frameCount = 0;
             _lastFpsCalculation = now;
+
+            // Check FPS warnings
+            if (_options.LogPerformanceWarnings && _currentFps < _options.FpsWarningThreshold)
+            {
+                Console.WriteLine($"[Performance Warning] Low FPS detected: {_currentFps:F1} (threshold: {_options.FpsWarningThreshold})");
+            }
         }
     }
 
@@ -183,7 +274,11 @@ public class PerformanceMonitor : IPerformanceMonitor
         _frameCount = 0;
         _currentFps = 0;
         _lastFpsCalculation = Stopwatch.GetTimestamp();
-        _lastGcCount = GC.CollectionCount(0);
+        
+        if (_options.TrackGarbageCollection)
+        {
+            _lastGcCount = GC.CollectionCount(0);
+        }
     }
 
     private CircularBuffer<float> GetOrCreateBuffer(string category)
@@ -192,10 +287,22 @@ public class PerformanceMonitor : IPerformanceMonitor
         {
             if (!_timings.TryGetValue(category, out var buffer))
             {
-                buffer = new CircularBuffer<float>(SampleCount);
+                buffer = new CircularBuffer<float>(_options.SampleCount);
                 _timings[category] = buffer;
             }
             return buffer;
+        }
+    }
+
+    private void CheckPerformanceWarnings(string category, float milliseconds)
+    {
+        if (category == "Frame" && milliseconds > _options.FrameTimeWarningThresholdMs)
+        {
+            Console.WriteLine($"[Performance Warning] High frame time: {milliseconds:F2}ms (threshold: {_options.FrameTimeWarningThresholdMs}ms)");
+        }
+        else if (category == "Physics" && milliseconds > 16f) // Physics should complete within 16ms
+        {
+            Console.WriteLine($"[Performance Warning] High physics time: {milliseconds:F2}ms");
         }
     }
 

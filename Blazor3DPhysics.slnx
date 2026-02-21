@@ -18,4 +18,7 @@
     <File Path="blazor-3d-bounce/samples/scenes/rope-pendulum.json" />
     <File Path="blazor-3d-bounce/samples/scenes/jelly-drop.json" />
   </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="CLAUDE.md" />
+  </Folder>
 </Solution>

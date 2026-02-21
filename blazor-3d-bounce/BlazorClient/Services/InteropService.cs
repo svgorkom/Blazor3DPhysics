@@ -18,9 +18,14 @@ public interface IInteropService
     Task CommitRigidTransformsAsync(float[] transforms, string[] ids);
 
     /// <summary>
-    /// Commits deformed vertex data for soft bodies.
+    /// Commits deformed vertex data for a single soft body.
     /// </summary>
     Task CommitSoftVerticesAsync(string id, float[] vertices, float[]? normals = null);
+
+    /// <summary>
+    /// Commits deformed vertex data for all soft bodies in a single call.
+    /// </summary>
+    Task CommitAllSoftVerticesAsync(Dictionary<string, SoftBodyVertexData> vertexData);
 
     /// <summary>
     /// Applies a single frame update (rigid transforms + soft vertices).
@@ -71,16 +76,12 @@ public class PerformanceStatsDto
 
 /// <summary>
 /// Implementation of JavaScript interop service with batching support.
+/// Optimized to minimize number of JS interop calls.
 /// </summary>
 public class InteropService : IInteropService, IAsyncDisposable
 {
     private readonly IJSRuntime _jsRuntime;
     private bool _initialized;
-
-    // Double buffering for soft body vertices
-    private readonly Dictionary<string, float[]> _vertexBufferA = new();
-    private readonly Dictionary<string, float[]> _vertexBufferB = new();
-    private bool _useBufferA = true;
 
     public InteropService(IJSRuntime jsRuntime)
     {
@@ -94,7 +95,6 @@ public class InteropService : IInteropService, IAsyncDisposable
 
         try
         {
-            // Initialize the interop module
             await _jsRuntime.InvokeVoidAsync("PhysicsInterop.initialize", canvasId);
             _initialized = true;
         }
@@ -108,7 +108,7 @@ public class InteropService : IInteropService, IAsyncDisposable
     /// <inheritdoc />
     public async Task CommitRigidTransformsAsync(float[] transforms, string[] ids)
     {
-        if (!_initialized) return;
+        if (!_initialized || ids.Length == 0) return;
         
         await _jsRuntime.InvokeVoidAsync("PhysicsInterop.updateRigidTransforms", transforms, ids);
     }
@@ -116,28 +116,24 @@ public class InteropService : IInteropService, IAsyncDisposable
     /// <inheritdoc />
     public async Task CommitSoftVerticesAsync(string id, float[] vertices, float[]? normals = null)
     {
-        if (!_initialized) return;
+        if (!_initialized || vertices.Length == 0) return;
 
-        // Double buffer management
-        var buffer = _useBufferA ? _vertexBufferA : _vertexBufferB;
-        
-        if (!buffer.TryGetValue(id, out var existingBuffer) || existingBuffer.Length != vertices.Length)
-        {
-            buffer[id] = new float[vertices.Length];
-        }
-        
-        Array.Copy(vertices, buffer[id], vertices.Length);
-        
-        await _jsRuntime.InvokeVoidAsync("PhysicsInterop.updateSoftBodyVertices", id, buffer[id], normals);
+        await _jsRuntime.InvokeVoidAsync("PhysicsInterop.updateSoftBodyVertices", id, vertices, normals);
+    }
+
+    /// <inheritdoc />
+    public async Task CommitAllSoftVerticesAsync(Dictionary<string, SoftBodyVertexData> vertexData)
+    {
+        if (!_initialized || vertexData.Count == 0) return;
+
+        // Single batched call for all soft bodies
+        await _jsRuntime.InvokeVoidAsync("PhysicsInterop.updateAllSoftBodies", vertexData);
     }
 
     /// <inheritdoc />
     public async Task ApplyFrameAsync(FrameData frameData)
     {
         if (!_initialized) return;
-
-        // Swap buffers
-        _useBufferA = !_useBufferA;
 
         await _jsRuntime.InvokeVoidAsync("PhysicsInterop.applyFrame", frameData);
     }
@@ -156,8 +152,6 @@ public class InteropService : IInteropService, IAsyncDisposable
     /// <inheritdoc />
     public ValueTask DisposeAsync()
     {
-        _vertexBufferA.Clear();
-        _vertexBufferB.Clear();
         return ValueTask.CompletedTask;
     }
 }

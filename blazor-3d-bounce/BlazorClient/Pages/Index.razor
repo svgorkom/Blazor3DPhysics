@@ -119,6 +119,8 @@
     private Viewport? _viewport;
     private bool _initialized;
     private bool _softBodyAvailable;
+    private Action? _sceneStateChangedHandler;
+    private Action? _simulationStateChangedHandler;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -154,9 +156,12 @@
 
             _initialized = true;
             
-            // Subscribe to state changes
-            SceneState.OnStateChanged += StateHasChanged;
-            SimulationLoop.OnSimulationStateChanged += StateHasChanged;
+            // Subscribe to state changes with proper cleanup tracking
+            _sceneStateChangedHandler = StateHasChanged;
+            _simulationStateChangedHandler = StateHasChanged;
+            
+            SceneState.OnStateChanged += _sceneStateChangedHandler;
+            SimulationLoop.OnSimulationStateChanged += _simulationStateChangedHandler;
 
             // Start simulation loop (SRP - loop logic extracted to service)
             await SimulationLoop.StartAsync();
@@ -324,11 +329,23 @@
 
     public async ValueTask DisposeAsync()
     {
+        // Unsubscribe from events to prevent memory leaks
+        if (_sceneStateChangedHandler != null)
+        {
+            SceneState.OnStateChanged -= _sceneStateChangedHandler;
+            _sceneStateChangedHandler = null;
+        }
+
+        if (_simulationStateChangedHandler != null)
+        {
+            SimulationLoop.OnSimulationStateChanged -= _simulationStateChangedHandler;
+            _simulationStateChangedHandler = null;
+        }
+
+        // Stop simulation loop first
         await SimulationLoop.DisposeAsync();
         
-        SceneState.OnStateChanged -= StateHasChanged;
-        SimulationLoop.OnSimulationStateChanged -= StateHasChanged;
-        
+        // Dispose services
         await RenderingService.DisposeAsync();
         await RigidPhysics.DisposeAsync();
         await SoftPhysics.DisposeAsync();

@@ -4,7 +4,7 @@ using Microsoft.JSInterop;
 namespace BlazorClient.Services;
 
 /// <summary>
-/// Interface for soft body physics using Ammo.js.
+/// Interface for soft body physics.
 /// Extends IPhysicsService and segregated interfaces for full SOLID compliance.
 /// </summary>
 public interface ISoftPhysicsService : IPhysicsService, IClothPhysicsService, IRopePhysicsService, 
@@ -24,6 +24,11 @@ public interface ISoftPhysicsService : IPhysicsService, IClothPhysicsService, IR
     /// Updates soft body material properties.
     /// </summary>
     Task UpdateSoftBodyAsync(SoftBody body);
+    
+    /// <summary>
+    /// Gets whether soft body physics is available (cached, non-async).
+    /// </summary>
+    bool IsAvailable { get; }
 }
 
 /// <summary>
@@ -48,7 +53,8 @@ public class SoftBodyVertexData
 }
 
 /// <summary>
-/// Implementation of soft body physics service using Ammo.js.
+/// Implementation of soft body physics service.
+/// Optimized for minimal interop overhead.
 /// </summary>
 public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
 {
@@ -61,15 +67,15 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
         _jsRuntime = jsRuntime;
     }
 
-    /// <inheritdoc />
-    public async Task<bool> IsAvailableAsync()
-    {
-        if (!_initialized)
-        {
-            return false;
-        }
+    /// <summary>
+    /// Cached availability check - no async call needed after init.
+    /// </summary>
+    public bool IsAvailable => _initialized && _isAvailable;
 
-        return _isAvailable;
+    /// <inheritdoc />
+    public Task<bool> IsAvailableAsync()
+    {
+        return Task.FromResult(_initialized && _isAvailable);
     }
 
     /// <inheritdoc />
@@ -100,7 +106,7 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task CreateClothAsync(SoftBody body)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         var clothData = new
         {
@@ -108,17 +114,14 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
             position = body.Transform.Position.ToArray(),
             width = body.Width,
             height = body.Height,
-            resolutionX = body.ResolutionX,
-            resolutionY = body.ResolutionY,
-            mass = body.Material.MassDensity * body.Width * body.Height,
+            // Cap resolution for performance
+            resolutionX = Math.Min(body.ResolutionX, 15),
+            resolutionY = Math.Min(body.ResolutionY, 15),
             structuralStiffness = body.Material.StructuralStiffness,
             shearStiffness = body.Material.ShearStiffness,
             bendingStiffness = body.Material.BendingStiffness,
             damping = body.Material.Damping,
-            selfCollision = body.Material.SelfCollision,
-            collisionMargin = body.Material.CollisionMargin,
-            thickness = body.Material.Thickness,
-            iterations = body.Material.ConstraintIterations,
+            iterations = Math.Min(body.Material.ConstraintIterations, 6),
             pinnedVertices = body.PinnedVertices.ToArray()
         };
 
@@ -128,20 +131,18 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task CreateRopeAsync(SoftBody body)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         var ropeData = new
         {
             id = body.Id,
             position = body.Transform.Position.ToArray(),
             length = body.Length,
-            segments = body.Segments,
-            radius = body.Material.Thickness,
-            mass = body.Material.MassDensity * body.Length,
+            segments = Math.Min(body.Segments, 25),
             structuralStiffness = body.Material.StructuralStiffness,
             bendingStiffness = body.Material.BendingStiffness,
             damping = body.Material.Damping,
-            iterations = body.Material.ConstraintIterations,
+            iterations = Math.Min(body.Material.ConstraintIterations, 8),
             pinnedVertices = body.PinnedVertices.ToArray()
         };
 
@@ -151,28 +152,18 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task CreateVolumetricAsync(SoftBody body)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         var volumeData = new
         {
             id = body.Id,
             position = body.Transform.Position.ToArray(),
-            width = body.Width,
-            height = body.Height,
-            depth = body.Depth,
             radius = body.Radius,
-            resolutionX = body.ResolutionX,
-            resolutionY = body.ResolutionY,
-            mass = body.Material.MassDensity * body.Width * body.Height * body.Depth,
+            resolutionX = Math.Min(body.ResolutionX, 8),
             structuralStiffness = body.Material.StructuralStiffness,
-            shearStiffness = body.Material.ShearStiffness,
-            bendingStiffness = body.Material.BendingStiffness,
             damping = body.Material.Damping,
             pressure = body.Material.Pressure,
-            volumeConservation = body.Material.VolumeConservation,
-            selfCollision = body.Material.SelfCollision,
-            collisionMargin = body.Material.CollisionMargin,
-            iterations = body.Material.ConstraintIterations
+            iterations = Math.Min(body.Material.ConstraintIterations, 6)
         };
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.createVolumetric", volumeData);
@@ -181,7 +172,7 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task RemoveSoftBodyAsync(string id)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.removeSoftBody", id);
     }
@@ -189,19 +180,13 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task UpdateSoftBodyAsync(SoftBody body)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         var updates = new
         {
             id = body.Id,
-            structuralStiffness = body.Material.StructuralStiffness,
-            shearStiffness = body.Material.ShearStiffness,
-            bendingStiffness = body.Material.BendingStiffness,
             damping = body.Material.Damping,
-            pressure = body.Material.Pressure,
-            volumeConservation = body.Material.VolumeConservation,
-            selfCollision = body.Material.SelfCollision,
-            iterations = body.Material.ConstraintIterations
+            iterations = Math.Min(body.Material.ConstraintIterations, 8)
         };
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.updateSoftBody", updates);
@@ -210,7 +195,7 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task PinVertexAsync(string id, int vertexIndex, Vector3 worldPosition)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.pinVertex", id, vertexIndex, worldPosition.ToArray());
     }
@@ -218,7 +203,7 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task UnpinVertexAsync(string id, int vertexIndex)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.unpinVertex", id, vertexIndex);
     }
@@ -226,13 +211,12 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task UpdateSettingsAsync(SimulationSettings settings)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         var config = new
         {
             gravity = settings.Gravity.ToArray(),
-            timeStep = settings.TimeStep,
-            subSteps = settings.SubSteps
+            timeStep = settings.TimeStep
         };
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.updateSettings", config);
@@ -241,7 +225,7 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task StepAsync(float deltaTime)
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.step", deltaTime);
     }
@@ -249,9 +233,10 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task<Dictionary<string, SoftBodyVertexData>> GetDeformedVerticesAsync()
     {
-        if (!_initialized || !_isAvailable) 
+        if (!IsAvailable) 
             return new Dictionary<string, SoftBodyVertexData>();
 
+        // Single batched call to get all vertex data
         return await _jsRuntime.InvokeAsync<Dictionary<string, SoftBodyVertexData>>(
             "SoftPhysicsModule.getAllDeformedVertices");
     }
@@ -259,17 +244,21 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     /// <inheritdoc />
     public async Task<SoftBodyVertexData> GetDeformedVerticesAsync(string id)
     {
-        if (!_initialized || !_isAvailable) 
+        if (!IsAvailable) 
             return new SoftBodyVertexData();
 
-        return await _jsRuntime.InvokeAsync<SoftBodyVertexData>(
-            "SoftPhysicsModule.getDeformedVertices", id);
+        var vertices = await _jsRuntime.InvokeAsync<float[]?>("SoftPhysicsModule.getDeformedVertices", id);
+        return new SoftBodyVertexData 
+        { 
+            Vertices = vertices ?? Array.Empty<float>(),
+            Normals = null
+        };
     }
 
     /// <inheritdoc />
     public async Task ResetAsync()
     {
-        if (!_initialized || !_isAvailable) return;
+        if (!IsAvailable) return;
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.reset");
     }
