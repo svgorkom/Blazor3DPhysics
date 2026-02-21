@@ -1,0 +1,246 @@
+@namespace BlazorClient.Components
+@using BlazorClient.Models
+
+<div class="panel-section">
+    <div class="panel-section-title">
+        Soft Body: @Body.Name
+        <button class="btn btn-danger btn-sm" style="margin-left: auto;" @onclick="OnDeleteClick"><i class="bi bi-trash"></i></button>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Type</label>
+        <input type="text" class="form-control" value="@Body.Type" disabled />
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Preset</label>
+        <select class="form-control" @onchange="OnPresetChange">
+            @foreach (var preset in Enum.GetValues<SoftBodyPreset>())
+            {
+                <option value="@preset">@preset</option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Structural Stiffness</label>
+        <div class="range-slider">
+            <input type="range" min="0" max="1" step="0.01"
+                   value="@Body.Material.StructuralStiffness"
+                   @oninput="e => OnMaterialChange(nameof(Body.Material.StructuralStiffness), e)" />
+            <span class="range-value">@Body.Material.StructuralStiffness.ToString("F2")</span>
+        </div>
+    </div>
+
+    @if (Body.Type == SoftBodyType.Cloth)
+    {
+        <div class="form-group">
+            <label class="form-label">Shear Stiffness</label>
+            <div class="range-slider">
+                <input type="range" min="0" max="1" step="0.01"
+                       value="@Body.Material.ShearStiffness"
+                       @oninput="e => OnMaterialChange(nameof(Body.Material.ShearStiffness), e)" />
+                <span class="range-value">@Body.Material.ShearStiffness.ToString("F2")</span>
+            </div>
+        </div>
+    }
+
+    <div class="form-group">
+        <label class="form-label">Bending Stiffness</label>
+        <div class="range-slider">
+            <input type="range" min="0" max="1" step="0.01"
+                   value="@Body.Material.BendingStiffness"
+                   @oninput="e => OnMaterialChange(nameof(Body.Material.BendingStiffness), e)" />
+            <span class="range-value">@Body.Material.BendingStiffness.ToString("F2")</span>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Damping</label>
+        <div class="range-slider">
+            <input type="range" min="0" max="1" step="0.01"
+                   value="@Body.Material.Damping"
+                   @oninput="e => OnMaterialChange(nameof(Body.Material.Damping), e)" />
+            <span class="range-value">@Body.Material.Damping.ToString("F2")</span>
+        </div>
+    </div>
+
+    @if (Body.Type == SoftBodyType.Volumetric)
+    {
+        <div class="form-group">
+            <label class="form-label">Pressure (kPa)</label>
+            <div class="range-slider">
+                <input type="range" min="0" max="200" step="1"
+                       value="@Body.Material.Pressure"
+                       @oninput="e => OnMaterialChange(nameof(Body.Material.Pressure), e)" />
+                <span class="range-value">@Body.Material.Pressure.ToString("F0")</span>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Volume Conservation</label>
+            <div class="range-slider">
+                <input type="range" min="0" max="1" step="0.01"
+                       value="@Body.Material.VolumeConservation"
+                       @oninput="e => OnMaterialChange(nameof(Body.Material.VolumeConservation), e)" />
+                <span class="range-value">@Body.Material.VolumeConservation.ToString("F2")</span>
+            </div>
+        </div>
+    }
+
+    <div class="form-group">
+        <label class="form-label">Constraint Iterations</label>
+        <div class="range-slider">
+            <input type="range" min="1" max="30" step="1"
+                   value="@Body.Material.ConstraintIterations"
+                   @oninput="e => OnIntMaterialChange(nameof(Body.Material.ConstraintIterations), e)" />
+            <span class="range-value">@Body.Material.ConstraintIterations</span>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="checkbox-group">
+            <input type="checkbox" checked="@Body.Material.SelfCollision"
+                   @onchange="e => OnBoolMaterialChange(nameof(Body.Material.SelfCollision), (bool)(e.Value ?? false))" />
+            <span>Self Collision</span>
+        </label>
+    </div>
+
+    @if (Body.Type == SoftBodyType.Cloth)
+    {
+        <div class="form-group">
+            <label class="form-label">Resolution (X × Y)</label>
+            <div class="property-grid">
+                <input type="number" class="form-control" min="2" max="50" step="1"
+                       value="@Body.ResolutionX" disabled />
+                <input type="number" class="form-control" min="2" max="50" step="1"
+                       value="@Body.ResolutionY" disabled />
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Size (W × H)</label>
+            <div class="property-grid">
+                <input type="number" class="form-control" min="0.1" max="10" step="0.1"
+                       value="@Body.Width" disabled />
+                <input type="number" class="form-control" min="0.1" max="10" step="0.1"
+                       value="@Body.Height" disabled />
+            </div>
+        </div>
+    }
+
+    @if (Body.Type == SoftBodyType.Rope)
+    {
+        <div class="form-group">
+            <label class="form-label">Segments</label>
+            <input type="number" class="form-control" value="@Body.Segments" disabled />
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Length (m)</label>
+            <input type="number" class="form-control" value="@Body.Length" disabled />
+        </div>
+    }
+
+    <div class="panel-section">
+        <div class="panel-section-title">Pinned Vertices (@Body.PinnedVertices.Count)</div>
+        <div class="text-muted" style="font-size: 0.75rem;">
+            @if (Body.PinnedVertices.Count > 0)
+            {
+                <span>Indices: @string.Join(", ", Body.PinnedVertices.Take(10))</span>
+                @if (Body.PinnedVertices.Count > 10)
+                {
+                    <span>... and @(Body.PinnedVertices.Count - 10) more</span>
+                }
+            }
+            else
+            {
+                <span>No pinned vertices</span>
+            }
+        </div>
+        <p class="text-muted mt-sm" style="font-size: 0.7rem;">
+            Tip: Click on vertices in viewport to pin/unpin (when implemented)
+        </p>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public SoftBody Body { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<SoftBody> OnBodyChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private async Task OnMaterialChange(string property, ChangeEventArgs e)
+    {
+        if (!float.TryParse(e.Value?.ToString(), out var value)) return;
+
+        switch (property)
+        {
+            case nameof(Body.Material.StructuralStiffness):
+                Body.Material.StructuralStiffness = value;
+                break;
+            case nameof(Body.Material.ShearStiffness):
+                Body.Material.ShearStiffness = value;
+                break;
+            case nameof(Body.Material.BendingStiffness):
+                Body.Material.BendingStiffness = value;
+                break;
+            case nameof(Body.Material.Damping):
+                Body.Material.Damping = value;
+                break;
+            case nameof(Body.Material.Pressure):
+                Body.Material.Pressure = value;
+                break;
+            case nameof(Body.Material.VolumeConservation):
+                Body.Material.VolumeConservation = value;
+                break;
+        }
+
+        Body.Material.Name = "Custom";
+        await OnBodyChanged.InvokeAsync(Body);
+    }
+
+    private async Task OnIntMaterialChange(string property, ChangeEventArgs e)
+    {
+        if (!int.TryParse(e.Value?.ToString(), out var value)) return;
+
+        switch (property)
+        {
+            case nameof(Body.Material.ConstraintIterations):
+                Body.Material.ConstraintIterations = value;
+                break;
+        }
+
+        await OnBodyChanged.InvokeAsync(Body);
+    }
+
+    private async Task OnBoolMaterialChange(string property, bool value)
+    {
+        switch (property)
+        {
+            case nameof(Body.Material.SelfCollision):
+                Body.Material.SelfCollision = value;
+                break;
+        }
+
+        await OnBodyChanged.InvokeAsync(Body);
+    }
+
+    private async Task OnPresetChange(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<SoftBodyPreset>(e.Value?.ToString(), out var preset))
+        {
+            Body.Material = SoftBodyMaterial.FromPreset(preset);
+            await OnBodyChanged.InvokeAsync(Body);
+        }
+    }
+
+    private async Task OnDeleteClick()
+    {
+        await OnDelete.InvokeAsync();
+    }
+}

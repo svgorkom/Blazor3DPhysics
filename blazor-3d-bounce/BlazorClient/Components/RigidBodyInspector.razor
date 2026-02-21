@@ -1,0 +1,223 @@
+@namespace BlazorClient.Components
+@using BlazorClient.Models
+
+<div class="panel-section">
+    <div class="panel-section-title">
+        Rigid Body: @Body.Name
+        <button class="btn btn-danger btn-sm" style="margin-left: auto;" @onclick="OnDeleteClick"><i class="bi bi-trash"></i></button>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Primitive Type</label>
+        <input type="text" class="form-control" value="@Body.PrimitiveType" disabled />
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Material Preset</label>
+        <select class="form-control" @onchange="OnMaterialPresetChange">
+            @foreach (var preset in Enum.GetValues<MaterialPreset>())
+            {
+                <option value="@preset" selected="@(Body.Material.Name.Equals(preset.ToString(), StringComparison.OrdinalIgnoreCase))">
+                    @preset
+                </option>
+            }
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Mass (kg)</label>
+        <div class="range-slider">
+            <input type="range" min="0.1" max="100" step="0.1"
+                   value="@Body.Mass"
+                   @oninput="e => OnPropertyChange(nameof(Body.Mass), e)" />
+            <span class="range-value">@Body.Mass.ToString("F1")</span>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Restitution (Bounciness)</label>
+        <div class="range-slider">
+            <input type="range" min="0" max="1" step="0.01"
+                   value="@Body.Material.Restitution"
+                   @oninput="e => OnMaterialChange(nameof(Body.Material.Restitution), e)" />
+            <span class="range-value">@Body.Material.Restitution.ToString("F2")</span>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Static Friction</label>
+        <div class="range-slider">
+            <input type="range" min="0" max="1" step="0.01"
+                   value="@Body.Material.StaticFriction"
+                   @oninput="e => OnMaterialChange(nameof(Body.Material.StaticFriction), e)" />
+            <span class="range-value">@Body.Material.StaticFriction.ToString("F2")</span>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Dynamic Friction</label>
+        <div class="range-slider">
+            <input type="range" min="0" max="1" step="0.01"
+                   value="@Body.Material.DynamicFriction"
+                   @oninput="e => OnMaterialChange(nameof(Body.Material.DynamicFriction), e)" />
+            <span class="range-value">@Body.Material.DynamicFriction.ToString("F2")</span>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Linear Damping</label>
+        <div class="range-slider">
+            <input type="range" min="0" max="1" step="0.01"
+                   value="@Body.LinearDamping"
+                   @oninput="e => OnPropertyChange(nameof(Body.LinearDamping), e)" />
+            <span class="range-value">@Body.LinearDamping.ToString("F2")</span>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Angular Damping</label>
+        <div class="range-slider">
+            <input type="range" min="0" max="1" step="0.01"
+                   value="@Body.AngularDamping"
+                   @oninput="e => OnPropertyChange(nameof(Body.AngularDamping), e)" />
+            <span class="range-value">@Body.AngularDamping.ToString("F2")</span>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="checkbox-group">
+            <input type="checkbox" checked="@Body.EnableCCD"
+                   @onchange="e => OnBoolPropertyChange(nameof(Body.EnableCCD), (bool)(e.Value ?? false))" />
+            <span>Enable CCD (Continuous Collision)</span>
+        </label>
+    </div>
+
+    <div class="form-group">
+        <label class="checkbox-group">
+            <input type="checkbox" checked="@Body.IsStatic"
+                   @onchange="e => OnBoolPropertyChange(nameof(Body.IsStatic), (bool)(e.Value ?? false))" />
+            <span>Static (Immovable)</span>
+        </label>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Position</label>
+        <div class="vector3-input">
+            <input type="number" class="form-control" step="0.1" value="@Body.Transform.Position.X" disabled />
+            <input type="number" class="form-control" step="0.1" value="@Body.Transform.Position.Y" disabled />
+            <input type="number" class="form-control" step="0.1" value="@Body.Transform.Position.Z" disabled />
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label class="form-label">Scale</label>
+        <div class="vector3-input">
+            <input type="number" class="form-control" step="0.1" min="0.1" max="10"
+                   value="@Body.Transform.Scale.X"
+                   @onchange="e => OnScaleChange(0, e)" />
+            <input type="number" class="form-control" step="0.1" min="0.1" max="10"
+                   value="@Body.Transform.Scale.Y"
+                   @onchange="e => OnScaleChange(1, e)" />
+            <input type="number" class="form-control" step="0.1" min="0.1" max="10"
+                   value="@Body.Transform.Scale.Z"
+                   @onchange="e => OnScaleChange(2, e)" />
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public RigidBody Body { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<RigidBody> OnBodyChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    private async Task OnPropertyChange(string property, ChangeEventArgs e)
+    {
+        if (!float.TryParse(e.Value?.ToString(), out var value)) return;
+
+        switch (property)
+        {
+            case nameof(Body.Mass):
+                Body.Mass = value;
+                break;
+            case nameof(Body.LinearDamping):
+                Body.LinearDamping = value;
+                break;
+            case nameof(Body.AngularDamping):
+                Body.AngularDamping = value;
+                break;
+        }
+
+        await OnBodyChanged.InvokeAsync(Body);
+    }
+
+    private async Task OnMaterialChange(string property, ChangeEventArgs e)
+    {
+        if (!float.TryParse(e.Value?.ToString(), out var value)) return;
+
+        switch (property)
+        {
+            case nameof(Body.Material.Restitution):
+                Body.Material.Restitution = value;
+                break;
+            case nameof(Body.Material.StaticFriction):
+                Body.Material.StaticFriction = value;
+                break;
+            case nameof(Body.Material.DynamicFriction):
+                Body.Material.DynamicFriction = value;
+                break;
+        }
+
+        Body.Material.Name = "Custom";
+        await OnBodyChanged.InvokeAsync(Body);
+    }
+
+    private async Task OnMaterialPresetChange(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<MaterialPreset>(e.Value?.ToString(), out var preset))
+        {
+            Body.Material = PhysicsMaterial.FromPreset(preset);
+            await OnBodyChanged.InvokeAsync(Body);
+        }
+    }
+
+    private async Task OnBoolPropertyChange(string property, bool value)
+    {
+        switch (property)
+        {
+            case nameof(Body.EnableCCD):
+                Body.EnableCCD = value;
+                break;
+            case nameof(Body.IsStatic):
+                Body.IsStatic = value;
+                break;
+        }
+
+        await OnBodyChanged.InvokeAsync(Body);
+    }
+
+    private async Task OnScaleChange(int axis, ChangeEventArgs e)
+    {
+        if (!float.TryParse(e.Value?.ToString(), out var value)) return;
+
+        var scale = Body.Transform.Scale;
+        Body.Transform.Scale = axis switch
+        {
+            0 => new Vector3(value, scale.Y, scale.Z),
+            1 => new Vector3(scale.X, value, scale.Z),
+            2 => new Vector3(scale.X, scale.Y, value),
+            _ => scale
+        };
+
+        await OnBodyChanged.InvokeAsync(Body);
+    }
+
+    private async Task OnDeleteClick()
+    {
+        await OnDelete.InvokeAsync();
+    }
+}

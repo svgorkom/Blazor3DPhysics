@@ -1,0 +1,82 @@
+{
+  "name": "Jelly Drop",
+  "description": "A volumetric soft body (jelly cube) dropped onto the ground, demonstrating pressure and volume preservation.",
+  "version": "1.0",
+  "settings": {
+    "gravity": { "x": 0, "y": -9.81, "z": 0 },
+    "timeStep": 0.008333,
+    "subSteps": 3,
+    "isPaused": false,
+    "timeScale": 1.0,
+    "enableSleeping": false,
+    "sleepThreshold": 0.01
+  },
+  "renderSettings": {
+    "enableShadows": true,
+    "shadowMapSize": 2048,
+    "enableSSAO": false,
+    "enableFXAA": true,
+    "showGrid": true,
+    "showAxes": true,
+    "showWireframe": false
+  },
+  "rigidBodies": [],
+  "softBodies": [
+    {
+      "id": "jelly-cube",
+      "name": "Jelly Cube",
+      "type": "Volumetric",
+      "transform": {
+        "position": { "x": 0, "y": 5, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      },
+      "resolutionX": 8,
+      "resolutionY": 8,
+      "width": 1.5,
+      "height": 1.5,
+      "depth": 1.5,
+      "radius": 0.75,
+      "material": {
+        "name": "Jelly",
+        "massDensity": 1.0,
+        "structuralStiffness": 0.5,
+        "shearStiffness": 0.4,
+        "bendingStiffness": 0.3,
+        "damping": 0.1,
+        "pressure": 50,
+        "volumeConservation": 0.95,
+        "selfCollision": true,
+        "collisionMargin": 0.02,
+        "thickness": 0.01,
+        "constraintIterations": 12,
+        "tearThreshold": 0
+      },
+      "pinnedVertices": []
+    }
+  ],
+  "testInstructions": [
+    "1. The jelly should fall and squash on impact",
+    "2. Volume should be approximately preserved (watch for bulging)",
+    "3. The jelly should bounce slightly and settle",
+    "4. Adjust pressure to see more/less squashing",
+    "5. Higher stiffness = less deformation, lower = more wobbly"
+  ],
+  "expectedBehavior": {
+    "impactDeformation": "Jelly should compress vertically and expand horizontally",
+    "volumePreservation": "Total volume should remain within 10% of original",
+    "settlingTime": "Should settle within 3-5 seconds",
+    "bounceCount": "1-2 small bounces before settling"
+  },
+  "parameterGuide": {
+    "pressure": {
+      "low": "0-20: Very soft, compresses easily",
+      "medium": "20-80: Normal jelly behavior",
+      "high": "80-150: Stiff, resists compression"
+    },
+    "volumeConservation": {
+      "low": "0.5-0.8: Volume can change significantly",
+      "high": "0.9-1.0: Volume strongly preserved"
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "name": "Bounce Regression Test",
+  "description": "Tests restitution coefficient with a bouncing sphere. Expected: apex heights decay as e² per bounce.",
+  "version": "1.0",
+  "settings": {
+    "gravity": { "x": 0, "y": -9.81, "z": 0 },
+    "timeStep": 0.008333,
+    "subSteps": 3,
+    "isPaused": false,
+    "timeScale": 1.0,
+    "enableSleeping": true,
+    "sleepThreshold": 0.01
+  },
+  "renderSettings": {
+    "enableShadows": true,
+    "shadowMapSize": 2048,
+    "enableSSAO": false,
+    "enableFXAA": true,
+    "showGrid": true,
+    "showAxes": true,
+    "showWireframe": false
+  },
+  "rigidBodies": [
+    {
+      "id": "test-sphere-1",
+      "name": "Bounce Test Sphere",
+      "primitiveType": "Sphere",
+      "transform": {
+        "position": { "x": 0, "y": 5, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      },
+      "material": {
+        "name": "Rubber",
+        "restitution": 0.8,
+        "staticFriction": 0.5,
+        "dynamicFriction": 0.4,
+        "density": 1000
+      },
+      "mass": 1.0,
+      "isStatic": false,
+      "enableCCD": false,
+      "linearDamping": 0.0,
+      "angularDamping": 0.0,
+      "linearVelocity": { "x": 0, "y": 0, "z": 0 },
+      "angularVelocity": { "x": 0, "y": 0, "z": 0 }
+    }
+  ],
+  "softBodies": [],
+  "expectedResults": {
+    "description": "With restitution e=0.8 and initial drop height h?=5m, apex heights should follow: h_n ? h? × e^(2n)",
+    "bounceHeights": [
+      { "bounce": 0, "expectedHeight": 5.0 },
+      { "bounce": 1, "expectedHeight": 3.2 },
+      { "bounce": 2, "expectedHeight": 2.048 },
+      { "bounce": 3, "expectedHeight": 1.311 },
+      { "bounce": 4, "expectedHeight": 0.839 }
+    ],
+    "tolerance": 0.1
+  },
+  "testInstructions": [
+    "1. Run the simulation and observe the sphere bouncing",
+    "2. The sphere should bounce with decreasing height each time",
+    "3. With e=0.8, each bounce should reach ~64% of previous height (e²=0.64)",
+    "4. Use the debug overlay to track apex heights if available"
+  ]
+}

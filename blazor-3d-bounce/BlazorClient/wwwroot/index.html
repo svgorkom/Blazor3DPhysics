@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Blazor 3D Physics - Rigid & Soft Body Simulation</title>
+    <base href="/" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    
+    <link href="css/site.css" rel="stylesheet" />
+    <link href="BlazorClient.styles.css" rel="stylesheet" />
+    
+    <!-- Babylon.js CDN -->
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="https://cdn.babylonjs.com/gui/babylon.gui.min.js"></script>
+    
+    <!-- Rapier.js for Rigid Body Physics -->
+    <script src="https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.12.0/rapier.min.js"></script>
+    
+    <!-- Ammo.js for Soft Body Physics -->
+    <script src="https://cdn.jsdelivr.net/npm/ammo.js@0.0.10/builds/ammo.wasm.js"></script>
+</head>
+
+<body>
+    <div id="app">
+        <div class="loading-screen">
+            <div class="spinner"></div>
+            <p>Loading 3D Physics Engine...</p>
+        </div>
+    </div>
+
+    <div id="blazor-error-ui" class="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss"><i class="bi bi-x-lg"></i></a>
+    </div>
+    
+    <!-- Application JS Modules -->
+    <script src="js/rendering.js" type="module"></script>
+    <script src="js/physics.rigid.js" type="module"></script>
+    <script src="js/physics.soft.js" type="module"></script>
+    <script src="js/interop.js"></script>
+    
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+
+</html>

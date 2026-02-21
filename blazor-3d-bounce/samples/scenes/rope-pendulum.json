@@ -1,0 +1,90 @@
+{
+  "name": "Rope Pendulum",
+  "description": "A rope pendulum demonstrating soft body rope physics with pinned top vertex.",
+  "version": "1.0",
+  "settings": {
+    "gravity": { "x": 0, "y": -9.81, "z": 0 },
+    "timeStep": 0.008333,
+    "subSteps": 3,
+    "isPaused": false,
+    "timeScale": 1.0,
+    "enableSleeping": false,
+    "sleepThreshold": 0.01
+  },
+  "renderSettings": {
+    "enableShadows": true,
+    "shadowMapSize": 2048,
+    "enableSSAO": false,
+    "enableFXAA": true,
+    "showGrid": true,
+    "showAxes": true,
+    "showWireframe": false
+  },
+  "rigidBodies": [
+    {
+      "id": "rope-weight",
+      "name": "Pendulum Weight",
+      "primitiveType": "Sphere",
+      "transform": {
+        "position": { "x": 2, "y": 2, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+        "scale": { "x": 0.5, "y": 0.5, "z": 0.5 }
+      },
+      "material": {
+        "name": "Steel",
+        "restitution": 0.5,
+        "staticFriction": 0.5,
+        "dynamicFriction": 0.4,
+        "density": 7800
+      },
+      "mass": 5.0,
+      "isStatic": false,
+      "enableCCD": false,
+      "linearDamping": 0.01,
+      "angularDamping": 0.01
+    }
+  ],
+  "softBodies": [
+    {
+      "id": "pendulum-rope",
+      "name": "Pendulum Rope",
+      "type": "Rope",
+      "transform": {
+        "position": { "x": 0, "y": 6, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      },
+      "segments": 30,
+      "length": 4.0,
+      "material": {
+        "name": "Rope",
+        "massDensity": 0.3,
+        "structuralStiffness": 0.95,
+        "shearStiffness": 0,
+        "bendingStiffness": 0.1,
+        "damping": 0.1,
+        "selfCollision": false,
+        "collisionMargin": 0.01,
+        "thickness": 0.02,
+        "constraintIterations": 15,
+        "tearThreshold": 0
+      },
+      "pinnedVertices": [0]
+    }
+  ],
+  "testInstructions": [
+    "1. The rope should hang and swing like a pendulum",
+    "2. Period should be approximately T = 2??(L/g) ? 4.0s for L=4m",
+    "3. Damping should gradually reduce swing amplitude",
+    "4. The rope should remain attached at the pinned top vertex"
+  ],
+  "expectedBehavior": {
+    "period": "~4.0 seconds for 4m rope",
+    "energyLoss": "Amplitude should decrease with damping",
+    "stability": "Rope should not stretch significantly or detach"
+  },
+  "physicsNotes": {
+    "pendulumPeriod": "T = 2??(L/g) where L is rope length",
+    "withL4m": "T = 2??(4/9.81) ? 4.01 seconds"
+  }
+}

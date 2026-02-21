@@ -1,0 +1,140 @@
+@namespace BlazorClient.Components
+@using BlazorClient.Models
+
+<div class="toolbar">
+    <span class="toolbar-title"><i class="bi bi-box"></i> Blazor 3D Physics</span>
+    
+    <div class="toolbar-group">
+        <button class="btn btn-secondary btn-icon" 
+                @onclick="OnPlayPauseClick" 
+                title="@(IsPaused ? "Play" : "Pause")"
+                data-tooltip="@(IsPaused ? "Play (Space)" : "Pause (Space)")">
+            <i class="bi @(IsPaused ? "bi-play-fill" : "bi-pause-fill")"></i>
+        </button>
+        <button class="btn btn-secondary btn-icon" 
+                @onclick="OnStepClick" 
+                disabled="@(!IsPaused)"
+                title="Step Forward"
+                data-tooltip="Step (S)">
+            <i class="bi bi-skip-forward-fill"></i>
+        </button>
+        <button class="btn btn-secondary btn-icon" 
+                @onclick="OnResetClick"
+                title="Reset Scene"
+                data-tooltip="Reset (R)">
+            <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+    </div>
+    
+    <div class="toolbar-group">
+        <span class="text-muted">Rigid:</span>
+        <div class="btn-group">
+            <button class="btn btn-secondary btn-sm" @onclick="() => SpawnRigid(RigidPrimitiveType.Sphere)"><i class="bi bi-circle-fill"></i> Sphere</button>
+            <button class="btn btn-secondary btn-sm" @onclick="() => SpawnRigid(RigidPrimitiveType.Box)"><i class="bi bi-box-fill"></i> Box</button>
+            <button class="btn btn-secondary btn-sm" @onclick="() => SpawnRigid(RigidPrimitiveType.Capsule)"><i class="bi bi-capsule"></i> Capsule</button>
+        </div>
+    </div>
+    
+    <div class="toolbar-group">
+        <span class="text-muted">Soft:</span>
+        <div class="btn-group">
+            <button class="btn btn-secondary btn-sm" @onclick="() => SpawnSoft(SoftBodyType.Cloth)"><i class="bi bi-grid-3x3"></i> Cloth</button>
+            <button class="btn btn-secondary btn-sm" @onclick="() => SpawnSoft(SoftBodyType.Rope)"><i class="bi bi-bezier2"></i> Rope</button>
+            <button class="btn btn-secondary btn-sm" @onclick="() => SpawnSoft(SoftBodyType.Volumetric)"><i class="bi bi-dice-3-fill"></i> Jelly</button>
+        </div>
+    </div>
+    
+    <div class="toolbar-group">
+        <label class="form-label" style="margin:0;">Presets:</label>
+        <select class="form-control" style="width:auto;" @onchange="OnPresetChange">
+            <option value="">Select preset...</option>
+            <option value="bounce-regression">Bounce Regression</option>
+            <option value="cloth-over-sphere">Cloth Over Sphere</option>
+            <option value="rope-pendulum">Rope Pendulum</option>
+            <option value="jelly-drop">Jelly Drop</option>
+        </select>
+    </div>
+    
+    <div class="toolbar-group" style="margin-left: auto; border-right: none;">
+        <button class="btn btn-secondary btn-icon" title="Help" data-tooltip="Help (H)"><i class="bi bi-question-circle"></i></button>
+        <button class="btn btn-secondary btn-icon" title="Settings" data-tooltip="Settings"><i class="bi bi-gear"></i></button>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// Whether the simulation is currently paused.
+    /// </summary>
+    [Parameter]
+    public bool IsPaused { get; set; }
+
+    /// <summary>
+    /// Callback to spawn a rigid body.
+    /// </summary>
+    [Parameter]
+    public EventCallback<RigidPrimitiveType> OnSpawnRigid { get; set; }
+
+    /// <summary>
+    /// Callback to spawn a soft body.
+    /// </summary>
+    [Parameter]
+    public EventCallback<SoftBodyType> OnSpawnSoft { get; set; }
+
+    /// <summary>
+    /// Callback to toggle play/pause.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnPlayPause { get; set; }
+
+    /// <summary>
+    /// Callback to reset the scene.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnReset { get; set; }
+
+    /// <summary>
+    /// Callback to step the simulation.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnStep { get; set; }
+
+    /// <summary>
+    /// Callback to load a preset.
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnLoadPreset { get; set; }
+
+    private async Task SpawnRigid(RigidPrimitiveType type)
+    {
+        await OnSpawnRigid.InvokeAsync(type);
+    }
+
+    private async Task SpawnSoft(SoftBodyType type)
+    {
+        await OnSpawnSoft.InvokeAsync(type);
+    }
+
+    private async Task OnPlayPauseClick()
+    {
+        await OnPlayPause.InvokeAsync();
+    }
+
+    private async Task OnResetClick()
+    {
+        await OnReset.InvokeAsync();
+    }
+
+    private async Task OnStepClick()
+    {
+        await OnStep.InvokeAsync();
+    }
+
+    private async Task OnPresetChange(ChangeEventArgs e)
+    {
+        var value = e.Value?.ToString();
+        if (!string.IsNullOrEmpty(value))
+        {
+            await OnLoadPreset.InvokeAsync(value);
+        }
+    }
+}

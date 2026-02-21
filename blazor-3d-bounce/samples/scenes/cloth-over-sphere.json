@@ -1,0 +1,88 @@
+{
+  "name": "Cloth Over Sphere",
+  "description": "Demonstrates cloth soft body draping over a static rigid sphere.",
+  "version": "1.0",
+  "settings": {
+    "gravity": { "x": 0, "y": -9.81, "z": 0 },
+    "timeStep": 0.008333,
+    "subSteps": 3,
+    "isPaused": false,
+    "timeScale": 1.0,
+    "enableSleeping": false,
+    "sleepThreshold": 0.01
+  },
+  "renderSettings": {
+    "enableShadows": true,
+    "shadowMapSize": 2048,
+    "enableSSAO": false,
+    "enableFXAA": true,
+    "showGrid": true,
+    "showAxes": true,
+    "showWireframe": false
+  },
+  "rigidBodies": [
+    {
+      "id": "static-sphere",
+      "name": "Static Sphere",
+      "primitiveType": "Sphere",
+      "transform": {
+        "position": { "x": 0, "y": 1.5, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+        "scale": { "x": 2, "y": 2, "z": 2 }
+      },
+      "material": {
+        "name": "Steel",
+        "restitution": 0.3,
+        "staticFriction": 0.4,
+        "dynamicFriction": 0.3,
+        "density": 7800
+      },
+      "mass": 1.0,
+      "isStatic": true,
+      "enableCCD": false,
+      "linearDamping": 0.0,
+      "angularDamping": 0.0
+    }
+  ],
+  "softBodies": [
+    {
+      "id": "draped-cloth",
+      "name": "Draped Cloth",
+      "type": "Cloth",
+      "transform": {
+        "position": { "x": 0, "y": 4, "z": 0 },
+        "rotation": { "x": 0, "y": 0, "z": 0, "w": 1 },
+        "scale": { "x": 1, "y": 1, "z": 1 }
+      },
+      "resolutionX": 25,
+      "resolutionY": 25,
+      "width": 3.0,
+      "height": 3.0,
+      "material": {
+        "name": "Cloth",
+        "massDensity": 0.5,
+        "structuralStiffness": 0.9,
+        "shearStiffness": 0.8,
+        "bendingStiffness": 0.2,
+        "damping": 0.05,
+        "selfCollision": false,
+        "collisionMargin": 0.02,
+        "thickness": 0.01,
+        "constraintIterations": 10,
+        "tearThreshold": 0
+      },
+      "pinnedVertices": []
+    }
+  ],
+  "testInstructions": [
+    "1. The cloth should fall and drape smoothly over the sphere",
+    "2. Adjust stiffness parameters to see how cloth behavior changes",
+    "3. Enable self-collision if edges fold over themselves",
+    "4. The cloth should settle without explosive behavior"
+  ],
+  "expectedBehavior": {
+    "drapingTime": "Cloth should settle within 3-5 seconds",
+    "stability": "No vertices should tunnel through the sphere",
+    "appearance": "Natural folds and wrinkles should form"
+  }
+}

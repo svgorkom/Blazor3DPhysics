@@ -1,0 +1,53 @@
+@namespace BlazorClient.Components
+
+<div class="viewport-container" 
+     @ondragover="HandleDragOver" 
+     @ondragover:preventDefault 
+     @ondrop="HandleDrop"
+     @ondrop:preventDefault>
+    <canvas id="@CanvasId" class="viewport-canvas" tabindex="0"></canvas>
+    
+    <div class="viewport-overlay">
+        @if (_isDragging)
+        {
+            <div class="drop-zone active">
+                <div class="drop-zone-icon">??</div>
+                <p>Drop GLTF/GLB file to load</p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// The HTML canvas element ID.
+    /// </summary>
+    [Parameter]
+    public string CanvasId { get; set; } = "renderCanvas";
+
+    /// <summary>
+    /// Callback when an object is selected in the viewport.
+    /// </summary>
+    [Parameter]
+    public EventCallback<string?> OnObjectSelected { get; set; }
+
+    /// <summary>
+    /// Callback when a model file is dropped.
+    /// </summary>
+    [Parameter]
+    public EventCallback<string> OnModelDropped { get; set; }
+
+    private bool _isDragging;
+
+    private void HandleDragOver(DragEventArgs e)
+    {
+        _isDragging = true;
+    }
+
+    private async Task HandleDrop(DragEventArgs e)
+    {
+        _isDragging = false;
+        // File handling would be done via JS interop
+        // This is a placeholder for the drag-and-drop functionality
+    }
+}

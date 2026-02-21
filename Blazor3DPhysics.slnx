@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/BlazorClient/">
+    <Project Path="blazor-3d-bounce/BlazorClient/BlazorClient.csproj" />
+  </Folder>
+  <Folder Name="/Documentation/">
+    <File Path="blazor-3d-bounce/README.md" />
+    <File Path="blazor-3d-bounce/docs/architecture.md" />
+    <File Path="blazor-3d-bounce/docs/physics.md" />
+    <File Path="blazor-3d-bounce/docs/softbody.md" />
+    <File Path="blazor-3d-bounce/docs/usage.md" />
+    <File Path="blazor-3d-bounce/docs/perf-tuning.md" />
+    <File Path="blazor-3d-bounce/docs/roadmap.md" />
+  </Folder>
+  <Folder Name="/Samples/">
+    <File Path="blazor-3d-bounce/samples/presets.json" />
+    <File Path="blazor-3d-bounce/samples/scenes/bounce-regression.json" />
+    <File Path="blazor-3d-bounce/samples/scenes/cloth-over-sphere.json" />
+    <File Path="blazor-3d-bounce/samples/scenes/rope-pendulum.json" />
+    <File Path="blazor-3d-bounce/samples/scenes/jelly-drop.json" />
+  </Folder>
+</Solution>

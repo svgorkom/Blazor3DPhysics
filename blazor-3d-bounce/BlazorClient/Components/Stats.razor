@@ -1,0 +1,62 @@
+@namespace BlazorClient.Components
+
+<div class="stats-bar">
+    <div class="stat-item">
+        <span class="stat-label">FPS:</span>
+        <span class="stat-value @GetFpsClass()">@FPS.ToString("F0")</span>
+    </div>
+    
+    <div class="stat-item">
+        <span class="stat-label">Physics:</span>
+        <span class="stat-value @GetPhysicsClass()">@PhysicsTimeMs.ToString("F1") ms</span>
+    </div>
+    
+    <div class="stat-item">
+        <span class="stat-label">Rigid Bodies:</span>
+        <span class="stat-value">@RigidBodyCount</span>
+    </div>
+    
+    <div class="stat-item">
+        <span class="stat-label">Soft Bodies:</span>
+        <span class="stat-value">@SoftBodyCount</span>
+    </div>
+    
+    <div class="stat-item" style="margin-left: auto;">
+        <span class="stat-label">Engine:</span>
+        <span class="stat-value">Babylon.js + Rapier + Ammo</span>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public float FPS { get; set; }
+
+    [Parameter]
+    public float PhysicsTimeMs { get; set; }
+
+    [Parameter]
+    public int RigidBodyCount { get; set; }
+
+    [Parameter]
+    public int SoftBodyCount { get; set; }
+
+    private string GetFpsClass()
+    {
+        return FPS switch
+        {
+            >= 55 => "good",
+            >= 30 => "warning",
+            _ => "danger"
+        };
+    }
+
+    private string GetPhysicsClass()
+    {
+        return PhysicsTimeMs switch
+        {
+            <= 4 => "good",
+            <= 8 => "warning",
+            _ => "danger"
+        };
+    }
+}

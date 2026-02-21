@@ -1,0 +1,92 @@
+{
+  "version": "1.0",
+  "presets": [
+    {
+      "name": "bounce-regression",
+      "displayName": "Bounce Regression Test",
+      "description": "Test restitution with geometrically decaying bounces",
+      "category": "rigid"
+    },
+    {
+      "name": "cloth-over-sphere",
+      "displayName": "Cloth Over Sphere",
+      "description": "Cloth draping over a static sphere",
+      "category": "soft"
+    },
+    {
+      "name": "rope-pendulum",
+      "displayName": "Rope Pendulum",
+      "description": "Rope swinging with gravity and damping",
+      "category": "soft"
+    },
+    {
+      "name": "jelly-drop",
+      "displayName": "Jelly Drop",
+      "description": "Volumetric soft body dropped on ground",
+      "category": "soft"
+    },
+    {
+      "name": "mixed-scene",
+      "displayName": "Mixed Physics Scene",
+      "description": "Combined rigid and soft body interaction",
+      "category": "mixed"
+    }
+  ],
+  "materialPresets": {
+    "rubber": {
+      "restitution": 0.8,
+      "staticFriction": 0.9,
+      "dynamicFriction": 0.8,
+      "density": 1100
+    },
+    "wood": {
+      "restitution": 0.4,
+      "staticFriction": 0.5,
+      "dynamicFriction": 0.4,
+      "density": 700
+    },
+    "steel": {
+      "restitution": 0.6,
+      "staticFriction": 0.6,
+      "dynamicFriction": 0.4,
+      "density": 7800
+    },
+    "ice": {
+      "restitution": 0.3,
+      "staticFriction": 0.1,
+      "dynamicFriction": 0.03,
+      "density": 920
+    }
+  },
+  "softBodyPresets": {
+    "cloth": {
+      "massDensity": 0.5,
+      "structuralStiffness": 0.9,
+      "shearStiffness": 0.8,
+      "bendingStiffness": 0.2,
+      "damping": 0.05,
+      "selfCollision": true,
+      "constraintIterations": 10
+    },
+    "rope": {
+      "massDensity": 0.3,
+      "structuralStiffness": 0.95,
+      "shearStiffness": 0,
+      "bendingStiffness": 0.1,
+      "damping": 0.1,
+      "selfCollision": false,
+      "constraintIterations": 15
+    },
+    "jelly": {
+      "massDensity": 1.0,
+      "structuralStiffness": 0.5,
+      "shearStiffness": 0.4,
+      "bendingStiffness": 0.3,
+      "damping": 0.1,
+      "pressure": 50,
+      "volumeConservation": 0.95,
+      "selfCollision": true,
+      "constraintIterations": 12
+    }
+  }
+}
