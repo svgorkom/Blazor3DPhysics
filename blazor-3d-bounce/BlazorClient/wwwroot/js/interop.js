@@ -1,6 +1,8 @@
 /**
  * Physics Interop Module
  * Handles batched communication between Blazor and JS physics/rendering modules
+ * 
+ * DIP Compliance: Dependencies are now injected rather than directly referenced
  */
 
 (function() {
@@ -33,14 +35,62 @@
 
     /**
      * Main interop object for Blazor communication
+     * DIP: Dependencies are injected, not hard-coded
      */
     window.PhysicsInterop = {
+        // Injected dependencies (DIP compliance)
+        _renderingModule: null,
+        _rigidPhysicsModule: null,
+        _softPhysicsModule: null,
+
+        /**
+         * Set the rendering module dependency
+         * @param {object} module - The rendering module
+         */
+        setRenderingModule: function(module) {
+            this._renderingModule = module;
+        },
+
+        /**
+         * Set the rigid physics module dependency
+         * @param {object} module - The rigid physics module
+         */
+        setRigidPhysicsModule: function(module) {
+            this._rigidPhysicsModule = module;
+        },
+
+        /**
+         * Set the soft physics module dependency
+         * @param {object} module - The soft physics module
+         */
+        setSoftPhysicsModule: function(module) {
+            this._softPhysicsModule = module;
+        },
+
+        /**
+         * Get the rendering module (with fallback for backward compatibility)
+         */
+        getRenderingModule: function() {
+            return this._renderingModule || window.RenderingModule;
+        },
+
         /**
          * Initialize all modules
          * @param {string} canvasId - Canvas element ID
          */
         initialize: async function(canvasId) {
             console.log('PhysicsInterop.initialize called with canvasId:', canvasId);
+            
+            // Auto-inject default modules if not set (backward compatibility)
+            if (!this._renderingModule && window.RenderingModule) {
+                this._renderingModule = window.RenderingModule;
+            }
+            if (!this._rigidPhysicsModule && window.RigidPhysicsModule) {
+                this._rigidPhysicsModule = window.RigidPhysicsModule;
+            }
+            if (!this._softPhysicsModule && window.SoftPhysicsModule) {
+                this._softPhysicsModule = window.SoftPhysicsModule;
+            }
             
             // Start FPS counter
             this.startFpsCounter();
@@ -78,6 +128,9 @@
         updateRigidTransforms: function(transforms, ids) {
             if (!transforms || !ids || ids.length === 0) return;
 
+            var renderingModule = this.getRenderingModule();
+            if (!renderingModule) return;
+
             var stride = 7; // position (3) + quaternion (4)
             
             for (var i = 0; i < ids.length; i++) {
@@ -96,10 +149,8 @@
                     transforms[offset + 6]
                 ];
 
-                // Update rendering
-                if (window.RenderingModule) {
-                    window.RenderingModule.updateMeshTransform(id, position, rotation, null);
-                }
+                // Update rendering using injected module
+                renderingModule.updateMeshTransform(id, position, rotation, null);
             }
         },
 
@@ -112,8 +163,9 @@
         updateSoftBodyVertices: function(id, vertices, normals) {
             if (!id || !vertices) return;
 
-            if (window.RenderingModule) {
-                window.RenderingModule.updateSoftMeshVertices(id, vertices, normals);
+            var renderingModule = this.getRenderingModule();
+            if (renderingModule) {
+                renderingModule.updateSoftMeshVertices(id, vertices, normals);
             }
         },
 
@@ -184,7 +236,10 @@
             const url = URL.createObjectURL(file);
             
             try {
-                const id = await window.RenderingModule.loadModel(url);
+                var renderingModule = this.getRenderingModule();
+                if (!renderingModule) return null;
+                
+                const id = await renderingModule.loadModel(url);
                 return { id, name: file.name };
             } finally {
                 URL.revokeObjectURL(url);

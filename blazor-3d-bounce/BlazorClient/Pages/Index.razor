@@ -4,6 +4,7 @@
 @inject ISoftPhysicsService SoftPhysics
 @inject IInteropService Interop
 @inject ISceneStateService SceneState
+@inject ISimulationLoopService SimulationLoop
 @implements IAsyncDisposable
 
 <Toolbar OnSpawnRigid="SpawnRigidBody" 
@@ -109,8 +110,8 @@
            OnRenderSettingsChanged="UpdateRenderSettings"
            OnDeleteObject="DeleteSelectedObject" />
 
-<Stats FPS="@_fps" 
-       PhysicsTimeMs="@_physicsTimeMs" 
+<Stats FPS="@SimulationLoop.Fps" 
+       PhysicsTimeMs="@SimulationLoop.PhysicsTimeMs" 
        RigidBodyCount="@SceneState.RigidBodies.Count"
        SoftBodyCount="@SceneState.SoftBodies.Count" />
 
@@ -118,12 +119,6 @@
     private Viewport? _viewport;
     private bool _initialized;
     private bool _softBodyAvailable;
-    private PeriodicTimer? _simulationTimer;
-    private CancellationTokenSource? _timerCts;
-    private float _fps;
-    private float _physicsTimeMs;
-    private DateTime _lastFrameTime = DateTime.UtcNow;
-    private float _accumulator;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -161,10 +156,10 @@
             
             // Subscribe to state changes
             SceneState.OnStateChanged += StateHasChanged;
+            SimulationLoop.OnSimulationStateChanged += StateHasChanged;
 
-            // Start simulation loop using PeriodicTimer (works in WASM)
-            _timerCts = new CancellationTokenSource();
-            _ = RunSimulationLoopAsync(_timerCts.Token);
+            // Start simulation loop (SRP - loop logic extracted to service)
+            await SimulationLoop.StartAsync();
 
             Console.WriteLine("Initialization complete");
             StateHasChanged();
@@ -173,89 +168,6 @@
         {
             Console.Error.WriteLine($"Initialization error: {ex.Message}");
             Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
-        }
-    }
-
-    private async Task RunSimulationLoopAsync(CancellationToken cancellationToken)
-    {
-        _simulationTimer = new PeriodicTimer(TimeSpan.FromMilliseconds(1000.0 / 60.0));
-        
-        try
-        {
-            while (await _simulationTimer.WaitForNextTickAsync(cancellationToken))
-            {
-                await SimulationTickAsync();
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected when disposed
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Simulation loop error: {ex.Message}");
-        }
-    }
-
-    private async Task SimulationTickAsync()
-    {
-        if (!_initialized || SceneState.Settings.IsPaused) return;
-
-        try
-        {
-            var now = DateTime.UtcNow;
-            var deltaTime = (float)(now - _lastFrameTime).TotalSeconds;
-            _lastFrameTime = now;
-
-            // Clamp delta time to prevent spiral of death
-            deltaTime = Math.Min(deltaTime, 0.1f);
-
-            var physicsStart = DateTime.UtcNow;
-
-            // Fixed timestep accumulator
-            _accumulator += deltaTime * SceneState.Settings.TimeScale;
-            var fixedDt = SceneState.Settings.TimeStep;
-
-            while (_accumulator >= fixedDt)
-            {
-                // Step physics
-                await RigidPhysics.StepAsync(fixedDt);
-                
-                if (_softBodyAvailable)
-                {
-                    await SoftPhysics.StepAsync(fixedDt);
-                }
-
-                _accumulator -= fixedDt;
-            }
-
-            _physicsTimeMs = (float)(DateTime.UtcNow - physicsStart).TotalMilliseconds;
-
-            // Get transforms and update rendering
-            var rigidBatch = await RigidPhysics.GetTransformBatchAsync();
-            if (rigidBatch.Ids.Length > 0)
-            {
-                await Interop.CommitRigidTransformsAsync(rigidBatch.Transforms, rigidBatch.Ids);
-            }
-
-            // Update soft body vertices
-            if (_softBodyAvailable && SceneState.SoftBodies.Count > 0)
-            {
-                var softVertices = await SoftPhysics.GetDeformedVerticesAsync();
-                foreach (var (id, data) in softVertices)
-                {
-                    await Interop.CommitSoftVerticesAsync(id, data.Vertices, data.Normals);
-                }
-            }
-
-            // Calculate FPS
-            _fps = deltaTime > 0 ? 1f / deltaTime : 0;
-
-            StateHasChanged();
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Simulation tick error: {ex.Message}");
         }
     }
 
@@ -312,6 +224,7 @@
 
         SceneState.AddSoftBody(body);
         
+        // ISP - Using specific interface methods
         switch (type)
         {
             case SoftBodyType.Cloth:
@@ -399,24 +312,8 @@
     {
         if (!SceneState.Settings.IsPaused) return;
 
-        await RigidPhysics.StepAsync(SceneState.Settings.TimeStep);
-        
-        if (_softBodyAvailable)
-        {
-            await SoftPhysics.StepAsync(SceneState.Settings.TimeStep);
-        }
-
-        var rigidBatch = await RigidPhysics.GetTransformBatchAsync();
-        await Interop.CommitRigidTransformsAsync(rigidBatch.Transforms, rigidBatch.Ids);
-
-        if (_softBodyAvailable && SceneState.SoftBodies.Count > 0)
-        {
-            var softVertices = await SoftPhysics.GetDeformedVerticesAsync();
-            foreach (var (id, data) in softVertices)
-            {
-                await Interop.CommitSoftVerticesAsync(id, data.Vertices, data.Normals);
-            }
-        }
+        // SRP - Step logic delegated to simulation loop service
+        await SimulationLoop.StepOnceAsync();
     }
 
     private async Task LoadPreset(string presetName)
@@ -427,10 +324,10 @@
 
     public async ValueTask DisposeAsync()
     {
-        _timerCts?.Cancel();
-        _simulationTimer?.Dispose();
+        await SimulationLoop.DisposeAsync();
         
         SceneState.OnStateChanged -= StateHasChanged;
+        SimulationLoop.OnSimulationStateChanged -= StateHasChanged;
         
         await RenderingService.DisposeAsync();
         await RigidPhysics.DisposeAsync();

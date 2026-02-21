@@ -1,6 +1,8 @@
 /**
  * Babylon.js Rendering Module
  * Handles 3D scene rendering, camera, lights, and mesh management
+ * 
+ * OCP Compliance: Mesh and material creation uses registry pattern
  */
 
 (function() {
@@ -20,9 +22,108 @@
     let settings = {};
 
     /**
+     * Mesh creator registry (OCP - extensible without modification)
+     */
+    const meshCreators = {
+        sphere: function(id, scene, options) {
+            return BABYLON.MeshBuilder.CreateSphere(id, {
+                diameter: options.diameter || 1,
+                segments: options.segments || 32
+            }, scene);
+        },
+        box: function(id, scene, options) {
+            return BABYLON.MeshBuilder.CreateBox(id, {
+                size: options.size || 1
+            }, scene);
+        },
+        capsule: function(id, scene, options) {
+            return BABYLON.MeshBuilder.CreateCapsule(id, {
+                radius: options.radius || 0.5,
+                height: options.height || 2,
+                tessellation: options.tessellation || 32
+            }, scene);
+        },
+        cylinder: function(id, scene, options) {
+            return BABYLON.MeshBuilder.CreateCylinder(id, {
+                diameter: options.diameter || 1,
+                height: options.height || 1,
+                tessellation: options.tessellation || 32
+            }, scene);
+        },
+        cone: function(id, scene, options) {
+            return BABYLON.MeshBuilder.CreateCylinder(id, {
+                diameterTop: 0,
+                diameterBottom: options.diameterBottom || 1,
+                height: options.height || 1,
+                tessellation: options.tessellation || 32
+            }, scene);
+        }
+    };
+
+    /**
+     * Material creator registry (OCP - extensible without modification)
+     */
+    const materialCreators = {
+        rubber: function(id, scene) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.8, 0.2, 0.2);
+            material.metallic = 0.0;
+            material.roughness = 0.7;
+            return material;
+        },
+        wood: function(id, scene) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.6, 0.4, 0.2);
+            material.metallic = 0.0;
+            material.roughness = 0.8;
+            return material;
+        },
+        steel: function(id, scene) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.7, 0.7, 0.75);
+            material.metallic = 0.9;
+            material.roughness = 0.3;
+            return material;
+        },
+        ice: function(id, scene) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.7, 0.9, 1.0);
+            material.metallic = 0.0;
+            material.roughness = 0.1;
+            material.alpha = 0.8;
+            return material;
+        },
+        default: function(id, scene) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+            material.albedoColor = new BABYLON.Color3(0.5, 0.5, 0.6);
+            material.metallic = 0.2;
+            material.roughness = 0.5;
+            return material;
+        }
+    };
+
+    /**
      * Initialize the Babylon.js rendering engine
      */
     window.RenderingModule = {
+        /**
+         * Register a custom mesh creator (OCP - extend without modification)
+         * @param {string} type - The mesh type name
+         * @param {function} creator - The creator function(id, scene, options)
+         */
+        registerMeshCreator: function(type, creator) {
+            meshCreators[type.toLowerCase()] = creator;
+        },
+
+        /**
+         * Register a custom material creator (OCP - extend without modification)
+         * @param {string} preset - The material preset name
+         * @param {function} creator - The creator function(id, scene)
+         */
+        registerMaterialCreator: function(preset, creator) {
+            materialCreators[preset.toLowerCase()] = creator;
+        },
+
         initialize: async function(canvasId, renderSettings) {
             console.log('RenderingModule.initialize called with canvasId:', canvasId);
             
@@ -212,53 +313,19 @@
             axesHelper = { x: xAxis, y: yAxis, z: zAxis };
         },
 
+        /**
+         * Create a rigid mesh using the registry pattern (OCP compliant)
+         */
         createRigidMesh: function(data) {
             console.log('Creating rigid mesh:', data.id, data.primitiveType);
-            let mesh;
+            
+            // Use registry to get creator (OCP - no switch statement)
+            const creator = meshCreators[data.primitiveType] || meshCreators.sphere;
+            const mesh = creator(data.id, scene, data.meshOptions || {});
 
-            switch (data.primitiveType) {
-                case 'sphere':
-                    mesh = BABYLON.MeshBuilder.CreateSphere(data.id, {
-                        diameter: 1,
-                        segments: 32
-                    }, scene);
-                    break;
-                case 'box':
-                    mesh = BABYLON.MeshBuilder.CreateBox(data.id, {
-                        size: 1
-                    }, scene);
-                    break;
-                case 'capsule':
-                    mesh = BABYLON.MeshBuilder.CreateCapsule(data.id, {
-                        radius: 0.5,
-                        height: 2,
-                        tessellation: 32
-                    }, scene);
-                    break;
-                case 'cylinder':
-                    mesh = BABYLON.MeshBuilder.CreateCylinder(data.id, {
-                        diameter: 1,
-                        height: 1,
-                        tessellation: 32
-                    }, scene);
-                    break;
-                case 'cone':
-                    mesh = BABYLON.MeshBuilder.CreateCylinder(data.id, {
-                        diameterTop: 0,
-                        diameterBottom: 1,
-                        height: 1,
-                        tessellation: 32
-                    }, scene);
-                    break;
-                default:
-                    mesh = BABYLON.MeshBuilder.CreateSphere(data.id, {
-                        diameter: 1
-                    }, scene);
-            }
-
-            // Apply material
-            const material = this.createMaterial(data.id, data.materialPreset);
-            mesh.material = material;
+            // Use registry for material (OCP - no switch statement)
+            const materialCreator = materialCreators[data.materialPreset] || materialCreators.default;
+            mesh.material = materialCreator(data.id, scene);
 
             // Apply transform
             if (data.position) {
@@ -296,38 +363,13 @@
             console.log('Rigid mesh created successfully');
         },
 
+        /**
+         * Create material using registry (OCP compliant)
+         * @deprecated Use materialCreators registry directly
+         */
         createMaterial: function(id, preset) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
-            
-            switch (preset) {
-                case 'rubber':
-                    material.albedoColor = new BABYLON.Color3(0.8, 0.2, 0.2);
-                    material.metallic = 0.0;
-                    material.roughness = 0.7;
-                    break;
-                case 'wood':
-                    material.albedoColor = new BABYLON.Color3(0.6, 0.4, 0.2);
-                    material.metallic = 0.0;
-                    material.roughness = 0.8;
-                    break;
-                case 'steel':
-                    material.albedoColor = new BABYLON.Color3(0.7, 0.7, 0.75);
-                    material.metallic = 0.9;
-                    material.roughness = 0.3;
-                    break;
-                case 'ice':
-                    material.albedoColor = new BABYLON.Color3(0.7, 0.9, 1.0);
-                    material.metallic = 0.0;
-                    material.roughness = 0.1;
-                    material.alpha = 0.8;
-                    break;
-                default:
-                    material.albedoColor = new BABYLON.Color3(0.5, 0.5, 0.6);
-                    material.metallic = 0.2;
-                    material.roughness = 0.5;
-            }
-
-            return material;
+            const creator = materialCreators[preset] || materialCreators.default;
+            return creator(id, scene);
         },
 
         createSoftMesh: function(data) {

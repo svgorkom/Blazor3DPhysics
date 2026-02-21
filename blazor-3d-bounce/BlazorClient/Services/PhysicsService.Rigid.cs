@@ -5,8 +5,9 @@ namespace BlazorClient.Services;
 
 /// <summary>
 /// Interface for rigid body physics using Rapier.js.
+/// Extends IPhysicsService for Liskov Substitution Principle compliance.
 /// </summary>
-public interface IRigidPhysicsService
+public interface IRigidPhysicsService : IPhysicsService
 {
     /// <summary>
     /// Initializes the rigid body physics world.
@@ -44,34 +45,14 @@ public interface IRigidPhysicsService
     Task SetLinearVelocityAsync(string id, Vector3 velocity);
 
     /// <summary>
-    /// Updates global simulation settings.
-    /// </summary>
-    Task UpdateSettingsAsync(SimulationSettings settings);
-
-    /// <summary>
-    /// Steps the physics simulation.
-    /// </summary>
-    Task StepAsync(float deltaTime);
-
-    /// <summary>
     /// Gets all rigid body transforms as a flat array for batching.
     /// </summary>
     Task<RigidTransformBatch> GetTransformBatchAsync();
 
     /// <summary>
-    /// Resets all rigid bodies to their initial state.
-    /// </summary>
-    Task ResetAsync();
-
-    /// <summary>
     /// Creates the ground plane collider.
     /// </summary>
     Task CreateGroundAsync(float restitution = 0.3f, float friction = 0.5f);
-
-    /// <summary>
-    /// Disposes physics resources.
-    /// </summary>
-    ValueTask DisposeAsync();
 }
 
 /// <summary>
@@ -101,6 +82,13 @@ public class RigidPhysicsService : IRigidPhysicsService, IAsyncDisposable
     public RigidPhysicsService(IJSRuntime jsRuntime)
     {
         _jsRuntime = jsRuntime;
+    }
+
+    /// <inheritdoc />
+    public Task<bool> IsAvailableAsync()
+    {
+        // Rigid physics is always available once initialized
+        return Task.FromResult(_initialized);
     }
 
     /// <inheritdoc />

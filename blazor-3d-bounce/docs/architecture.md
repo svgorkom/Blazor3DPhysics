@@ -2,6 +2,18 @@
 
 This document describes the system architecture of the Blazor 3D Physics application.
 
+## SOLID Principles Compliance
+
+This codebase follows all five SOLID principles:
+
+| Principle | Implementation |
+|-----------|----------------|
+| **S**ingle Responsibility | `SimulationLoopService` handles only simulation timing; `Index.razor` handles only UI |
+| **O**pen/Closed | Mesh and material creation uses registry pattern - extend without modification |
+| **L**iskov Substitution | All physics services implement `IPhysicsService` base interface |
+| **I**nterface Segregation | Soft body interfaces split: `IClothPhysicsService`, `IRopePhysicsService`, etc. |
+| **D**ependency Inversion | All components depend on abstractions (interfaces), not concrete implementations |
+
 ## High-Level Architecture
 
 ```mermaid
@@ -29,21 +41,27 @@ The C# layer handles:
 ```
 BlazorClient/
 ??? Pages/
-?   ??? Index.razor          # Main page, simulation loop
+?   ??? Index.razor              # Main page, UI coordination only (SRP)
 ??? Components/
-?   ??? Viewport.razor       # Canvas host
-?   ??? Toolbar.razor        # Spawn controls, playback
-?   ??? Inspector.razor      # Property editing
-?   ??? Stats.razor          # Performance display
+?   ??? Viewport.razor           # Canvas host
+?   ??? Toolbar.razor            # Spawn controls, playback
+?   ??? Inspector.razor          # Property editing
+?   ??? Stats.razor              # Performance display
 ??? Services/
-?   ??? RenderingService.cs  # Babylon.js wrapper
-?   ??? RigidPhysicsService.cs # Rapier wrapper
-?   ??? SoftPhysicsService.cs  # Ammo wrapper
-?   ??? InteropService.cs    # Batched JS calls
-?   ??? SceneStateService.cs # Central state
+?   ??? Interfaces/
+?   ?   ??? IPhysicsInterfaces.cs # Segregated physics interfaces (ISP)
+?   ??? Factories/
+?   ?   ??? MeshCreatorFactory.cs    # Extensible mesh creation (OCP)
+?   ?   ??? MaterialCreatorFactory.cs # Extensible material creation (OCP)
+?   ??? SimulationLoopService.cs  # Physics loop timing only (SRP)
+?   ??? RenderingService.cs       # Babylon.js wrapper
+?   ??? PhysicsService.Rigid.cs   # Rapier wrapper (implements IPhysicsService)
+?   ??? PhysicsService.Soft.cs    # Ammo wrapper (implements segregated interfaces)
+?   ??? InteropService.cs         # Batched JS calls
+?   ??? SceneStateService.cs      # Central state
 ??? Models/
-    ??? PhysicsTypes.cs      # Value types, materials
-    ??? SceneObjects.cs      # Entity definitions
+    ??? PhysicsTypes.cs           # Value types, materials
+    ??? SceneObjects.cs           # Entity definitions
 ```
 
 ### JavaScript Layer
@@ -55,10 +73,112 @@ The JS layer handles:
 
 ```
 wwwroot/js/
-??? rendering.js       # Babylon.js scene, materials, meshes
+??? rendering.js       # Babylon.js scene with registry pattern (OCP)
 ??? physics.rigid.js   # Rapier world, bodies, colliders
 ??? physics.soft.js    # Ammo soft body world
-??? interop.js         # Bridge, batching, performance
+??? interop.js         # Bridge with dependency injection (DIP)
+```
+
+## Service Interfaces (SOLID Compliant)
+
+### Base Physics Interface (LSP)
+
+All physics services implement this base interface, enabling uniform treatment:
+
+```csharp
+public interface IPhysicsService
+{
+    Task<bool> IsAvailableAsync();
+    Task StepAsync(float deltaTime);
+    Task UpdateSettingsAsync(SimulationSettings settings);
+    Task ResetAsync();
+    ValueTask DisposeAsync();
+}
+```
+
+### Segregated Soft Body Interfaces (ISP)
+
+Clients depend only on the interfaces they need:
+
+```csharp
+public interface IClothPhysicsService
+{
+    Task CreateClothAsync(SoftBody body);
+}
+
+public interface IRopePhysicsService
+{
+    Task CreateRopeAsync(SoftBody body);
+}
+
+public interface IVolumetricPhysicsService
+{
+    Task CreateVolumetricAsync(SoftBody body);
+}
+
+public interface IVertexPinningService
+{
+    Task PinVertexAsync(string id, int vertexIndex, Vector3 worldPosition);
+    Task UnpinVertexAsync(string id, int vertexIndex);
+}
+
+public interface ISoftBodyVertexDataService
+{
+    Task<Dictionary<string, SoftBodyVertexData>> GetDeformedVerticesAsync();
+    Task<SoftBodyVertexData> GetDeformedVerticesAsync(string id);
+}
+```
+
+### Simulation Loop Service (SRP)
+
+Extracted from Index.razor to handle only simulation timing:
+
+```csharp
+public interface ISimulationLoopService : IAsyncDisposable
+{
+    event Action? OnSimulationStateChanged;
+    float Fps { get; }
+    float PhysicsTimeMs { get; }
+    bool IsRunning { get; }
+    
+    Task StartAsync();
+    Task StopAsync();
+    Task StepOnceAsync();
+}
+```
+
+## Factory Pattern (OCP)
+
+### Mesh Creator Factory
+
+Extensible mesh creation without modifying existing code:
+
+```csharp
+public interface IMeshCreator
+{
+    RigidPrimitiveType PrimitiveType { get; }
+    object GetMeshOptions(RigidBody body);
+}
+
+public interface IMeshCreatorFactory
+{
+    IMeshCreator GetCreator(RigidPrimitiveType primitiveType);
+    void RegisterCreator(IMeshCreator creator); // Extend without modification
+}
+```
+
+### JavaScript Registry Pattern
+
+```javascript
+// OCP - Add new mesh types without modifying createRigidMesh
+const meshCreators = {
+    sphere: (id, scene, options) => BABYLON.MeshBuilder.CreateSphere(id, options, scene),
+    box: (id, scene, options) => BABYLON.MeshBuilder.CreateBox(id, options, scene),
+    // Add new types here without modifying createRigidMesh function
+};
+
+// Register custom creators at runtime
+RenderingModule.registerMeshCreator('custom', myCustomCreator);
 ```
 
 ## Data Flow
@@ -68,30 +188,30 @@ wwwroot/js/
 ```mermaid
 sequenceDiagram
     participant Timer as Timer (60 Hz)
-    participant Blazor as Blazor Service
-    participant Rigid as Rapier.js
-    participant Soft as Ammo.js
-    participant Render as Babylon.js
+    participant Loop as SimulationLoopService
+    participant Rigid as IRigidPhysicsService
+    participant Soft as ISoftPhysicsService
+    participant Interop as IInteropService
 
-    Timer->>Blazor: Tick
-    Blazor->>Blazor: Accumulate deltaTime
+    Timer->>Loop: Tick
+    Loop->>Loop: Accumulate deltaTime
     
     loop While accumulator >= fixedDt
-        Blazor->>Rigid: Step(fixedDt)
-        Blazor->>Soft: Step(fixedDt)
-        Blazor->>Blazor: accumulator -= fixedDt
+        Loop->>Rigid: StepAsync(fixedDt)
+        Loop->>Soft: StepAsync(fixedDt)
+        Loop->>Loop: accumulator -= fixedDt
     end
     
-    Blazor->>Rigid: GetTransformBatch()
-    Rigid-->>Blazor: [positions, rotations]
+    Loop->>Rigid: GetTransformBatchAsync()
+    Rigid-->>Loop: RigidTransformBatch
     
-    Blazor->>Soft: GetDeformedVertices()
-    Soft-->>Blazor: {id: vertices[]}
+    Loop->>Soft: GetDeformedVerticesAsync()
+    Soft-->>Loop: Dictionary<string, SoftBodyVertexData>
     
-    Blazor->>Render: CommitTransforms()
-    Blazor->>Render: UpdateVertices()
+    Loop->>Interop: CommitRigidTransformsAsync()
+    Loop->>Interop: CommitSoftVerticesAsync()
     
-    Note over Render: Babylon render loop updates canvas
+    Loop->>Loop: OnSimulationStateChanged?.Invoke()
 ```
 
 ### Fixed Timestep Accumulator
@@ -117,53 +237,29 @@ void Update(float deltaTime)
 }
 ```
 
-## Service Interfaces
+## Dependency Injection Setup
 
-### IRenderingService
-
-```csharp
-public interface IRenderingService
-{
-    Task InitializeAsync(string canvasId, RenderSettings settings);
-    Task CreateRigidMeshAsync(RigidBody body);
-    Task CreateSoftMeshAsync(SoftBody body);
-    Task UpdateMeshTransformAsync(string id, TransformData transform);
-    Task UpdateSoftMeshVerticesAsync(string id, float[] vertices, float[]? normals);
-    Task RemoveMeshAsync(string id);
-    Task SetSelectionAsync(string? id);
-}
-```
-
-### IRigidPhysicsService
+All services are registered with proper abstractions (DIP):
 
 ```csharp
-public interface IRigidPhysicsService
-{
-    Task InitializeAsync(SimulationSettings settings);
-    Task CreateRigidBodyAsync(RigidBody body);
-    Task RemoveRigidBodyAsync(string id);
-    Task UpdateRigidBodyAsync(RigidBody body);
-    Task StepAsync(float deltaTime);
-    Task<RigidTransformBatch> GetTransformBatchAsync();
-    Task ResetAsync();
-}
-```
+// Core services
+builder.Services.AddScoped<IRenderingService, RenderingService>();
+builder.Services.AddScoped<IRigidPhysicsService, RigidPhysicsService>();
+builder.Services.AddScoped<ISoftPhysicsService, SoftPhysicsService>();
+builder.Services.AddScoped<IInteropService, InteropService>();
+builder.Services.AddScoped<ISceneStateService, SceneStateService>();
 
-### ISoftPhysicsService
+// Simulation loop (SRP)
+builder.Services.AddScoped<ISimulationLoopService, SimulationLoopService>();
 
-```csharp
-public interface ISoftPhysicsService
-{
-    Task InitializeAsync(SimulationSettings settings);
-    Task CreateClothAsync(SoftBody body);
-    Task CreateRopeAsync(SoftBody body);
-    Task CreateVolumetricAsync(SoftBody body);
-    Task PinVertexAsync(string id, int vertexIndex, Vector3 position);
-    Task UnpinVertexAsync(string id, int vertexIndex);
-    Task StepAsync(float deltaTime);
-    Task<Dictionary<string, SoftBodyVertexData>> GetDeformedVerticesAsync();
-    Task<bool> IsAvailableAsync();
-}
+// Factories (OCP)
+builder.Services.AddSingleton<IMeshCreatorFactory, MeshCreatorFactory>();
+builder.Services.AddSingleton<IMaterialCreatorFactory, MaterialCreatorFactory>();
+
+// Segregated interfaces (ISP) - same implementation, different interfaces
+builder.Services.AddScoped<IClothPhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
+builder.Services.AddScoped<IRopePhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
+builder.Services.AddScoped<IVolumetricPhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
 ```
 
 ## Interop Batching Strategy
@@ -232,11 +328,12 @@ public class SceneStateService
 
 ```mermaid
 sequenceDiagram
-    participant App as Blazor App
-    participant Int as InteropService
-    participant Rnd as RenderingService
-    participant Rig as RigidPhysicsService
-    participant Sft as SoftPhysicsService
+    participant App as Index.razor
+    participant Int as IInteropService
+    participant Rnd as IRenderingService
+    participant Rig as IRigidPhysicsService
+    participant Sft as ISoftPhysicsService
+    participant Loop as ISimulationLoopService
 
     App->>Int: InitializeAsync("canvas")
     Int->>Int: Setup performance monitoring
@@ -255,7 +352,8 @@ sequenceDiagram
     Sft->>Sft: Create soft body world
     Sft-->>App: isAvailable
     
-    App->>App: Start simulation timer
+    App->>Loop: StartAsync()
+    Loop->>Loop: Start PeriodicTimer
 ```
 
 ## Error Handling

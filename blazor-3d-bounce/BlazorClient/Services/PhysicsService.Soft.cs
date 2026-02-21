@@ -5,28 +5,15 @@ namespace BlazorClient.Services;
 
 /// <summary>
 /// Interface for soft body physics using Ammo.js.
+/// Extends IPhysicsService and segregated interfaces for full SOLID compliance.
 /// </summary>
-public interface ISoftPhysicsService
+public interface ISoftPhysicsService : IPhysicsService, IClothPhysicsService, IRopePhysicsService, 
+    IVolumetricPhysicsService, IVertexPinningService, ISoftBodyVertexDataService
 {
     /// <summary>
     /// Initializes the soft body physics world.
     /// </summary>
     Task InitializeAsync(SimulationSettings settings);
-
-    /// <summary>
-    /// Creates a cloth soft body.
-    /// </summary>
-    Task CreateClothAsync(SoftBody body);
-
-    /// <summary>
-    /// Creates a rope soft body.
-    /// </summary>
-    Task CreateRopeAsync(SoftBody body);
-
-    /// <summary>
-    /// Creates a volumetric (jelly) soft body.
-    /// </summary>
-    Task CreateVolumetricAsync(SoftBody body);
 
     /// <summary>
     /// Removes a soft body from the physics world.
@@ -37,51 +24,6 @@ public interface ISoftPhysicsService
     /// Updates soft body material properties.
     /// </summary>
     Task UpdateSoftBodyAsync(SoftBody body);
-
-    /// <summary>
-    /// Pins a vertex to a fixed world position.
-    /// </summary>
-    Task PinVertexAsync(string id, int vertexIndex, Vector3 worldPosition);
-
-    /// <summary>
-    /// Unpins a vertex.
-    /// </summary>
-    Task UnpinVertexAsync(string id, int vertexIndex);
-
-    /// <summary>
-    /// Updates global simulation settings.
-    /// </summary>
-    Task UpdateSettingsAsync(SimulationSettings settings);
-
-    /// <summary>
-    /// Steps the soft body simulation.
-    /// </summary>
-    Task StepAsync(float deltaTime);
-
-    /// <summary>
-    /// Gets deformed vertices for all soft bodies.
-    /// </summary>
-    Task<Dictionary<string, SoftBodyVertexData>> GetDeformedVerticesAsync();
-
-    /// <summary>
-    /// Gets deformed vertices for a specific soft body.
-    /// </summary>
-    Task<SoftBodyVertexData> GetDeformedVerticesAsync(string id);
-
-    /// <summary>
-    /// Resets all soft bodies to their initial state.
-    /// </summary>
-    Task ResetAsync();
-
-    /// <summary>
-    /// Checks if soft body physics is available (fallback detection).
-    /// </summary>
-    Task<bool> IsAvailableAsync();
-
-    /// <summary>
-    /// Disposes physics resources.
-    /// </summary>
-    ValueTask DisposeAsync();
 }
 
 /// <summary>
@@ -117,6 +59,17 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     public SoftPhysicsService(IJSRuntime jsRuntime)
     {
         _jsRuntime = jsRuntime;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> IsAvailableAsync()
+    {
+        if (!_initialized)
+        {
+            return false;
+        }
+
+        return _isAvailable;
     }
 
     /// <inheritdoc />
@@ -319,17 +272,6 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
         if (!_initialized || !_isAvailable) return;
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.reset");
-    }
-
-    /// <inheritdoc />
-    public async Task<bool> IsAvailableAsync()
-    {
-        if (!_initialized)
-        {
-            return false;
-        }
-
-        return _isAvailable;
     }
 
     /// <inheritdoc />
