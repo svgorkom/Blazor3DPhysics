@@ -1,6 +1,6 @@
 {
   "name": "Bounce Regression Test",
-  "description": "Tests restitution coefficient with a bouncing sphere. Expected: apex heights decay as e² per bounce.",
+  "description": "Tests restitution coefficient with a bouncing sphere. Expected: apex heights decay as eï¿½ per bounce.",
   "version": "1.0",
   "settings": {
     "gravity": { "x": 0, "y": -9.81, "z": 0 },
@@ -48,7 +48,7 @@
   ],
   "softBodies": [],
   "expectedResults": {
-    "description": "With restitution e=0.8 and initial drop height h?=5m, apex heights should follow: h_n ? h? × e^(2n)",
+    "description": "With restitution e=0.8 and initial drop height h?=5m, apex heights should follow: h_n ? h? ï¿½ e^(2n)",
     "bounceHeights": [
       { "bounce": 0, "expectedHeight": 5.0 },
       { "bounce": 1, "expectedHeight": 3.2 },
@@ -61,7 +61,7 @@
   "testInstructions": [
     "1. Run the simulation and observe the sphere bouncing",
     "2. The sphere should bounce with decreasing height each time",
-    "3. With e=0.8, each bounce should reach ~64% of previous height (e²=0.64)",
+    "3. With e=0.8, each bounce should reach ~64% of previous height (eï¿½=0.64)",
     "4. Use the debug overlay to track apex heights if available"
   ]
 }

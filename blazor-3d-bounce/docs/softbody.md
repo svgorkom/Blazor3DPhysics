@@ -17,11 +17,15 @@ This document details the soft body physics implementation using Ammo.js (Bullet
 2D surface composed of connected vertices in a grid:
 
 ```
-?????????
-?????????
-?????????
-?????????
-?????????
+o---o---o---o---o
+|   |   |   |   |
+o---o---o---o---o
+|   |   |   |   |
+o---o---o---o---o
+|   |   |   |   |
+o---o---o---o---o
+|   |   |   |   |
+o---o---o---o---o
 ```
 
 **Use cases**: Flags, curtains, tablecloths, fabric
@@ -31,8 +35,9 @@ This document details the soft body physics implementation using Ammo.js (Bullet
 1D chain of connected vertices:
 
 ```
-???????????????????
-? (gravity)
+o---o---o---o---o---o---o---o---o---o
+                                    |
+                                    v (gravity)
 ```
 
 **Use cases**: Ropes, cables, chains, hair strands
@@ -42,12 +47,12 @@ This document details the soft body physics implementation using Ammo.js (Bullet
 3D deformable body with internal pressure:
 
 ```
-    ????
-   ?    ?
-  ?  ??? ?
-  ? ???? ?
-   ?    ?
-    ????
+    .---.
+   /     \
+  |  ~~~  |
+  | ~~~~~ |
+   \     /
+    '---'
 ```
 
 **Use cases**: Jelly, balloons, organs, bouncing balls
@@ -59,7 +64,7 @@ This document details the soft body physics implementation using Ammo.js (Bullet
 Maintain edge lengths (structural integrity):
 
 ```
-??????????
+o---------o
    L?
 ```
 
@@ -70,12 +75,12 @@ Force: `F = k × (|L| - L?) × direction`
 Resist diagonal deformation (prevents skewing):
 
 ```
-???????
-??   ??
-? ? ? ?
-? ? ? ?
-??   ??
-???????
+o-----o
+|\   /|
+| \ / |
+| / \ |
+|/   \|
+o-----o
 ```
 
 ### Bending Constraints
@@ -83,12 +88,12 @@ Resist diagonal deformation (prevents skewing):
 Resist folding (maintains surface smoothness):
 
 ```
-    ?         ?
-   /?\   ?   /?\
-  / ? \     ? ? ?
- ?  ?  ?   ???????
-    ?         ? resists
-    ?         ?
+    o         o
+   /|\   ?   /|\
+  / | \     / | \
+ o  |  o   o--+--o
+    |         | resists
+    v         v
 ```
 
 ### Volume Constraints (Volumetric Only)

@@ -116,9 +116,9 @@ Reduces rotational velocity:
 Fast-moving objects can pass through thin surfaces between timesteps:
 
 ```
-Frame N: ? ??????????????????????????|???? wall
-Frame N+1:                           |    ?
-                                     ^ Object passed through!
+Frame N:   ?--------------------------|---- wall
+Frame N+1:                            |    ?
+                                      ^ Object passed through!
 ```
 
 ### CCD Solution
