@@ -52,6 +52,46 @@
     };
 
     /**
+     * Get adapter info with compatibility for different browser versions
+     * @param {GPUAdapter} adapter - The WebGPU adapter
+     * @returns {Promise<Object>} Adapter info object
+     */
+    async function getAdapterInfo(adapter) {
+        // Try the new 'info' property first (Chrome 121+, standard spec)
+        if (adapter.info) {
+            return {
+                device: adapter.info.device || 'Unknown Device',
+                vendor: adapter.info.vendor || 'Unknown Vendor',
+                architecture: adapter.info.architecture || 'Unknown',
+                description: adapter.info.description || ''
+            };
+        }
+        
+        // Try the deprecated requestAdapterInfo method (older Chrome versions)
+        if (typeof adapter.requestAdapterInfo === 'function') {
+            try {
+                const info = await adapter.requestAdapterInfo();
+                return {
+                    device: info.device || 'Unknown Device',
+                    vendor: info.vendor || 'Unknown Vendor',
+                    architecture: info.architecture || 'Unknown',
+                    description: info.description || ''
+                };
+            } catch (e) {
+                console.warn('requestAdapterInfo failed:', e);
+            }
+        }
+        
+        // Fallback if neither method is available
+        return {
+            device: 'Unknown Device',
+            vendor: 'Unknown Vendor',
+            architecture: 'Unknown',
+            description: ''
+        };
+    }
+
+    /**
      * Detect WebGPU availability and capabilities
      * @returns {Promise<Object>} WebGPU capabilities object
      */
@@ -79,13 +119,13 @@
                 return webGpuCapabilities;
             }
 
-            // Get adapter info
-            const adapterInfo = await adapter.requestAdapterInfo();
+            // Get adapter info (compatible with different browser versions)
+            const adapterInfo = await getAdapterInfo(adapter);
             
             webGpuCapabilities.isSupported = true;
-            webGpuCapabilities.adapterName = adapterInfo.device || 'Unknown Device';
-            webGpuCapabilities.vendor = adapterInfo.vendor || 'Unknown Vendor';
-            webGpuCapabilities.architecture = adapterInfo.architecture || 'Unknown';
+            webGpuCapabilities.adapterName = adapterInfo.device;
+            webGpuCapabilities.vendor = adapterInfo.vendor;
+            webGpuCapabilities.architecture = adapterInfo.architecture;
             webGpuCapabilities.isFallbackAdapter = adapter.isFallbackAdapter || false;
 
             // Get features

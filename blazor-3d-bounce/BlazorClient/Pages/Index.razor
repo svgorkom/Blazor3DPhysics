@@ -147,26 +147,51 @@
         {
             Console.WriteLine("Starting initialization...");
             
-            // Initialize interop
-            await Interop.InitializeAsync("renderCanvas");
-            Console.WriteLine("Interop initialized");
+            // Initialize interop first
+            try
+            {
+                await Interop.InitializeAsync("renderCanvas");
+                Console.WriteLine("Interop initialized");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Interop initialization failed: {ex.Message}");
+                // Continue without interop - physics will still work
+            }
 
             // Initialize rendering
-            await RenderingService.InitializeAsync("renderCanvas", SceneState.RenderSettings);
-            Console.WriteLine("Rendering initialized");
-            
-            // Get renderer info
-            await UpdateRendererInfoAsync();
+            try
+            {
+                await RenderingService.InitializeAsync("renderCanvas", SceneState.RenderSettings);
+                Console.WriteLine("Rendering initialized");
+                
+                // Get renderer info
+                await UpdateRendererInfoAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Rendering initialization failed: {ex.Message}");
+                Console.Error.WriteLine("Physics will still work, but no visuals will be displayed.");
+                // Don't return - continue to initialize physics
+            }
 
-            // Initialize rigid physics
+            // Initialize rigid physics - this is required
             await RigidPhysics.InitializeAsync(SceneState.Settings);
             await RigidPhysics.CreateGroundAsync(0.3f, 0.5f);
             Console.WriteLine("Rigid physics initialized");
 
             // Initialize soft physics
-            await SoftPhysics.InitializeAsync(SceneState.Settings);
-            _softBodyAvailable = await SoftPhysics.IsAvailableAsync();
-            Console.WriteLine($"Soft physics initialized, available: {_softBodyAvailable}");
+            try
+            {
+                await SoftPhysics.InitializeAsync(SceneState.Settings);
+                _softBodyAvailable = await SoftPhysics.IsAvailableAsync();
+                Console.WriteLine($"Soft physics initialized, available: {_softBodyAvailable}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Soft physics initialization failed: {ex.Message}");
+                _softBodyAvailable = false;
+            }
 
             _initialized = true;
             
@@ -214,6 +239,12 @@
 
     private async Task SpawnRigidBody(RigidPrimitiveType type)
     {
+        if (!_initialized)
+        {
+            Console.WriteLine("Cannot spawn rigid body: scene not initialized");
+            return;
+        }
+        
         var body = new RigidBody(type, MaterialPreset.Rubber)
         {
             Transform = new TransformData
@@ -233,7 +264,11 @@
 
     private async Task SpawnSoftBody(SoftBodyType type)
     {
-        if (!_softBodyAvailable) return;
+        if (!_initialized || !_softBodyAvailable)
+        {
+            Console.WriteLine("Cannot spawn soft body: scene not initialized or soft body unavailable");
+            return;
+        }
 
         var preset = type switch
         {

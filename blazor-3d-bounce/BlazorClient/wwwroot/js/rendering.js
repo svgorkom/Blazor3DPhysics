@@ -20,7 +20,7 @@
     let shadowGenerator = null;
     let meshes = new Map();
     let softMeshes = new Map();
-    let softMeshData = new Map(); // Store original mesh data for rebuilding
+    let softMeshData = new Map();
     let settings = {};
     
     // Renderer backend state
@@ -45,38 +45,38 @@
      * Mesh creator registry (OCP - extensible without modification)
      */
     const meshCreators = {
-        sphere: function(id, scene, options) {
+        sphere: function(id, scn, options) {
             return BABYLON.MeshBuilder.CreateSphere(id, {
                 diameter: options.diameter || 1,
                 segments: options.segments || 32
-            }, scene);
+            }, scn);
         },
-        box: function(id, scene, options) {
+        box: function(id, scn, options) {
             return BABYLON.MeshBuilder.CreateBox(id, {
                 size: options.size || 1
-            }, scene);
+            }, scn);
         },
-        capsule: function(id, scene, options) {
+        capsule: function(id, scn, options) {
             return BABYLON.MeshBuilder.CreateCapsule(id, {
                 radius: options.radius || 0.5,
                 height: options.height || 2,
                 tessellation: options.tessellation || 32
-            }, scene);
+            }, scn);
         },
-        cylinder: function(id, scene, options) {
+        cylinder: function(id, scn, options) {
             return BABYLON.MeshBuilder.CreateCylinder(id, {
                 diameter: options.diameter || 1,
                 height: options.height || 1,
                 tessellation: options.tessellation || 32
-            }, scene);
+            }, scn);
         },
-        cone: function(id, scene, options) {
+        cone: function(id, scn, options) {
             return BABYLON.MeshBuilder.CreateCylinder(id, {
                 diameterTop: 0,
                 diameterBottom: options.diameterBottom || 1,
                 height: options.height || 1,
                 tessellation: options.tessellation || 32
-            }, scene);
+            }, scn);
         }
     };
 
@@ -84,37 +84,37 @@
      * Material creator registry (OCP - extensible without modification)
      */
     const materialCreators = {
-        rubber: function(id, scene) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+        rubber: function(id, scn) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scn);
             material.albedoColor = new BABYLON.Color3(0.8, 0.2, 0.2);
             material.metallic = 0.0;
             material.roughness = 0.7;
             return material;
         },
-        wood: function(id, scene) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+        wood: function(id, scn) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scn);
             material.albedoColor = new BABYLON.Color3(0.6, 0.4, 0.2);
             material.metallic = 0.0;
             material.roughness = 0.8;
             return material;
         },
-        steel: function(id, scene) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+        steel: function(id, scn) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scn);
             material.albedoColor = new BABYLON.Color3(0.7, 0.7, 0.75);
             material.metallic = 0.9;
             material.roughness = 0.3;
             return material;
         },
-        ice: function(id, scene) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+        ice: function(id, scn) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scn);
             material.albedoColor = new BABYLON.Color3(0.7, 0.9, 1.0);
             material.metallic = 0.0;
             material.roughness = 0.1;
             material.alpha = 0.8;
             return material;
         },
-        default: function(id, scene) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+        default: function(id, scn) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scn);
             material.albedoColor = new BABYLON.Color3(0.5, 0.5, 0.6);
             material.metallic = 0.2;
             material.roughness = 0.5;
@@ -126,35 +126,31 @@
      * Soft mesh creator registry (OCP - extensible without modification)
      */
     const softMeshCreators = {
-        cloth: function(id, scene, data) {
+        cloth: function(id, scn, data) {
             const width = data.width || 2;
             const height = data.height || 2;
             const resX = data.resolutionX || 20;
             const resY = data.resolutionY || 20;
             
-            // Create a ground mesh that matches Ammo.js cloth vertex layout
             const mesh = BABYLON.MeshBuilder.CreateGround(id, {
                 width: width,
                 height: height,
                 subdivisions: Math.max(resX, resY),
                 updatable: true
-            }, scene);
+            }, scn);
             
-            // Rotate to match Ammo.js orientation (vertical cloth)
             mesh.rotation.x = -Math.PI / 2;
-            
             return mesh;
         },
         
-        volumetric: function(id, scene, data) {
+        volumetric: function(id, scn, data) {
             const radius = data.radius || 0.5;
             
-            // Create sphere with enough segments for deformation
             const mesh = BABYLON.MeshBuilder.CreateSphere(id, {
                 diameter: radius * 2,
                 segments: data.resolutionX || 12,
                 updatable: true
-            }, scene);
+            }, scn);
             
             return mesh;
         }
@@ -164,8 +160,8 @@
      * Soft material creator registry
      */
     const softMaterialCreators = {
-        cloth: function(id, scene, data) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+        cloth: function(id, scn, data) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scn);
             material.albedoColor = new BABYLON.Color3(0.2, 0.5, 0.8);
             material.metallic = 0.0;
             material.roughness = 0.8;
@@ -174,8 +170,8 @@
             return material;
         },
         
-        volumetric: function(id, scene, data) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+        volumetric: function(id, scn, data) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scn);
             material.albedoColor = new BABYLON.Color3(0.8, 0.3, 0.3);
             material.metallic = 0.0;
             material.roughness = 0.4;
@@ -183,8 +179,8 @@
             return material;
         },
         
-        default: function(id, scene, data) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
+        default: function(id, scn, data) {
+            const material = new BABYLON.PBRMaterial(id + "_mat", scn);
             material.albedoColor = new BABYLON.Color3(0.2, 0.6, 0.8);
             material.metallic = 0.0;
             material.roughness = 0.6;
@@ -195,20 +191,17 @@
 
     /**
      * Determine the best rendering backend to use
-     * @param {string} preferredBackend - User preference ('WebGPU', 'WebGL2', 'WebGL', 'Auto')
-     * @returns {Promise<Object>} Backend selection result
      */
-    async function selectRenderingBackend(preferredBackend = 'Auto') {
+    async function selectRenderingBackend(preferredBackend) {
+        preferredBackend = preferredBackend || 'Auto';
         console.log('Selecting rendering backend, preference:', preferredBackend);
         
-        // Use WebGPU module if available
         if (window.WebGPUModule) {
             const result = await window.WebGPUModule.selectRendererBackend(preferredBackend);
             backendCapabilities = result;
             return result;
         }
         
-        // Fallback detection without WebGPU module
         const result = {
             selectedBackend: 'WebGL2',
             webgpu: { isSupported: false },
@@ -216,7 +209,6 @@
             fallbackReason: 'WebGPU module not loaded'
         };
         
-        // Basic WebGPU check
         if (navigator.gpu && (preferredBackend === 'WebGPU' || preferredBackend === 'Auto')) {
             try {
                 const adapter = await navigator.gpu.requestAdapter();
@@ -236,10 +228,6 @@
 
     /**
      * Create Babylon.js engine with the appropriate backend
-     * @param {HTMLCanvasElement} canvas - Canvas element
-     * @param {string} backend - Selected backend ('WebGPU', 'WebGL2', 'WebGL')
-     * @param {Object} engineOptions - Engine options
-     * @returns {Promise<BABYLON.Engine>} Babylon.js engine
      */
     async function createEngineForBackend(canvas, backend, engineOptions) {
         console.log('Creating engine for backend:', backend);
@@ -253,7 +241,6 @@
         
         if (backend === 'WebGPU') {
             try {
-                // Check if Babylon.js WebGPU engine is available
                 if (BABYLON.WebGPUEngine) {
                     console.log('Creating WebGPU engine...');
                     const webgpuEngine = new BABYLON.WebGPUEngine(canvas, baseOptions);
@@ -263,11 +250,24 @@
                     rendererInfo.isWebGPU = true;
                     rendererInfo.isFallback = false;
                     
-                    // Get adapter info
                     if (webgpuEngine._adapter) {
-                        const adapterInfo = await webgpuEngine._adapter.requestAdapterInfo();
-                        rendererInfo.vendor = adapterInfo.vendor || 'Unknown';
-                        rendererInfo.renderer = adapterInfo.device || 'WebGPU Device';
+                        try {
+                            if (webgpuEngine._adapter.info) {
+                                rendererInfo.vendor = webgpuEngine._adapter.info.vendor || 'Unknown';
+                                rendererInfo.renderer = webgpuEngine._adapter.info.device || 'WebGPU Device';
+                            } else if (typeof webgpuEngine._adapter.requestAdapterInfo === 'function') {
+                                const adapterInfo = await webgpuEngine._adapter.requestAdapterInfo();
+                                rendererInfo.vendor = adapterInfo.vendor || 'Unknown';
+                                rendererInfo.renderer = adapterInfo.device || 'WebGPU Device';
+                            } else {
+                                rendererInfo.vendor = 'Unknown';
+                                rendererInfo.renderer = 'WebGPU Device';
+                            }
+                        } catch (adapterErr) {
+                            console.warn('Could not get adapter info:', adapterErr);
+                            rendererInfo.vendor = 'Unknown';
+                            rendererInfo.renderer = 'WebGPU Device';
+                        }
                     }
                     
                     console.log('WebGPU engine created successfully');
@@ -283,11 +283,9 @@
             }
         }
         
-        // WebGL2 / WebGL fallback
         console.log('Creating WebGL engine...');
         const webglEngine = new BABYLON.Engine(canvas, true, baseOptions);
         
-        // Determine actual WebGL version
         const gl = webglEngine._gl;
         if (gl instanceof WebGL2RenderingContext) {
             rendererInfo.backend = 'WebGL2';
@@ -300,7 +298,6 @@
         rendererInfo.isWebGPU = false;
         rendererInfo.isFallback = backend === 'WebGPU';
         
-        // Get renderer info
         const debugInfo = gl ? gl.getExtension('WEBGL_debug_renderer_info') : null;
         if (debugInfo) {
             rendererInfo.vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
@@ -312,29 +309,21 @@
         return webglEngine;
     }
 
-    /**
-     * Start performance tracking
-     */
     function startPerformanceTracking() {
         lastFrameTime = performance.now();
         frameCount = 0;
         
-        // Update WebGPU module metrics if available
         if (window.WebGPUModule) {
             window.WebGPUModule.resetPerformanceMetrics();
         }
     }
 
-    /**
-     * Track frame for performance metrics
-     */
     function trackFrame() {
         const now = performance.now();
         const frameTime = now - lastFrameTime;
         lastFrameTime = now;
         frameCount++;
         
-        // Update WebGPU module metrics if available
         if (window.WebGPUModule) {
             window.WebGPUModule.recordFrameTime(frameTime);
             window.WebGPUModule.updatePerformanceMetrics({
@@ -346,105 +335,11 @@
     }
 
     /**
-     * Initialize the Babylon.js rendering engine
+     * Initialize the Babylon.js rendering engine - MAIN MODULE
      */
     window.RenderingModule = {
-        /**
-         * Register a custom mesh creator (OCP - extend without modification)
-         * @param {string} type - The mesh type name
-         * @param {function} creator - The creator function(id, scene, options)
-         */
-        registerMeshCreator: function(type, creator) {
-            meshCreators[type.toLowerCase()] = creator;
-        },
-
-        /**
-         * Register a custom material creator (OCP - extend without modification)
-         * @param {string} preset - The material preset name
-         * @param {function} creator - The creator function(id, scene)
-         */
-        registerMaterialCreator: function(preset, creator) {
-            materialCreators[preset.toLowerCase()] = creator;
-        },
-
-        /**
-         * Register a custom soft mesh creator (OCP - extend without modification)
-         */
-        registerSoftMeshCreator: function(type, creator) {
-            softMeshCreators[type.toLowerCase()] = creator;
-        },
-
-        /**
-         * Register a custom soft material creator (OCP - extend without modification)
-         */
-        registerSoftMaterialCreator: function(type, creator) {
-            softMaterialCreators[type.toLowerCase()] = creator;
-        },
-
-        /**
-         * Detect available rendering backends
-         * @returns {Promise<Object>} Detection results
-         */
-        detectBackends: async function() {
-            if (window.WebGPUModule) {
-                return await window.WebGPUModule.getAllCapabilities();
-            }
-            
-            // Basic detection without WebGPU module
-            const webgpuSupported = !!navigator.gpu;
-            const canvas = document.createElement('canvas');
-            const webgl2Supported = !!canvas.getContext('webgl2');
-            const webglSupported = !!canvas.getContext('webgl');
-            
-            return {
-                webgpu: { isSupported: webgpuSupported },
-                webgl2: { isSupported: webgl2Supported },
-                webgl: { isSupported: webglSupported }
-            };
-        },
-
-        /**
-         * Get current renderer information
-         * @returns {Object} Renderer info
-         */
-        getRendererInfo: function() {
-            return { ...rendererInfo };
-        },
-
-        /**
-         * Get current active backend
-         * @returns {string} Backend name
-         */
-        getActiveBackend: function() {
-            return activeBackend;
-        },
-
-        /**
-         * Get performance metrics
-         * @returns {Object} Performance metrics
-         */
-        getPerformanceMetrics: function() {
-            if (window.WebGPUModule) {
-                return window.WebGPUModule.getPerformanceMetrics();
-            }
-            
-            return {
-                backend: activeBackend,
-                fps: engine ? engine.getFps() : 0,
-                frameTimeMs: engine ? 1000 / engine.getFps() : 0
-            };
-        },
-
-        /**
-         * Run performance benchmark
-         * @param {string} canvasId - Canvas element ID
-         * @returns {Promise<Object>} Benchmark results
-         */
-        runBenchmark: async function(canvasId) {
-            if (window.WebGPUModule) {
-                return await window.WebGPUModule.runBenchmark(canvasId);
-            }
-            return { error: 'WebGPU module not loaded' };
+        isInitialized: function() {
+            return engine !== null && scene !== null;
         },
 
         initialize: async function(canvasId, renderSettings) {
@@ -456,7 +351,6 @@
                 return false;
             }
 
-            // Check if BABYLON is available
             if (typeof BABYLON === 'undefined') {
                 console.error('Babylon.js not loaded');
                 return false;
@@ -465,35 +359,42 @@
             settings = renderSettings || {};
 
             try {
-                // Ensure canvas has dimensions - wait for layout if needed
-                if (canvas.clientWidth === 0 || canvas.clientHeight === 0) {
-                    console.log('Canvas has no dimensions, waiting for layout...');
+                let retries = 0;
+                while ((canvas.clientWidth === 0 || canvas.clientHeight === 0) && retries < 10) {
+                    console.log('Canvas has no dimensions, waiting for layout... (attempt ' + (retries + 1) + ')');
                     await new Promise(resolve => setTimeout(resolve, 100));
+                    retries++;
                 }
 
-                // Force canvas to fill its container
-                canvas.width = canvas.clientWidth || window.innerWidth;
-                canvas.height = canvas.clientHeight || window.innerHeight;
+                canvas.width = canvas.clientWidth || window.innerWidth || 800;
+                canvas.height = canvas.clientHeight || window.innerHeight || 600;
                 
                 console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
 
-                // Select rendering backend
                 const preferredBackend = settings.preferredBackend || 'Auto';
                 const backendSelection = await selectRenderingBackend(preferredBackend);
                 console.log('Backend selection:', backendSelection);
 
-                // Create engine with selected backend
                 engine = await createEngineForBackend(canvas, backendSelection.selectedBackend, {
                     preserveDrawingBuffer: true,
                     stencil: true,
                     antialias: true
                 });
+                
+                if (!engine) {
+                    console.error('Failed to create engine');
+                    return false;
+                }
 
-                // Create scene
                 scene = new BABYLON.Scene(engine);
+                
+                if (!scene) {
+                    console.error('Failed to create scene');
+                    return false;
+                }
+                
                 scene.clearColor = new BABYLON.Color4(0.1, 0.1, 0.15, 1);
 
-                // Setup camera
                 camera = new BABYLON.ArcRotateCamera(
                     "camera",
                     -Math.PI / 4,
@@ -509,7 +410,6 @@
                 camera.lowerRadiusLimit = 2;
                 camera.upperRadiusLimit = 100;
 
-                // Setup lights
                 const hemiLight = new BABYLON.HemisphericLight(
                     "hemiLight",
                     new BABYLON.Vector3(0, 1, 0),
@@ -525,7 +425,6 @@
                 dirLight.position = new BABYLON.Vector3(10, 20, 10);
                 dirLight.intensity = 0.8;
 
-                // Shadow generator
                 if (settings.enableShadows !== false) {
                     shadowGenerator = new BABYLON.ShadowGenerator(
                         settings.shadowMapSize || 2048,
@@ -535,13 +434,10 @@
                     shadowGenerator.blurKernel = 32;
                 }
 
-                // Highlight layer for selection
                 highlightLayer = new BABYLON.HighlightLayer("highlight", scene);
 
-                // Create ground
                 this.createGround();
 
-                // Create helpers
                 if (settings.showGrid !== false) {
                     this.createGrid();
                 }
@@ -549,26 +445,25 @@
                     this.createAxes();
                 }
 
-                // Post processing
                 if (settings.enableFXAA !== false) {
                     new BABYLON.FxaaPostProcess("fxaa", 1.0, camera);
                 }
 
-                // Start performance tracking
                 startPerformanceTracking();
 
-                // Start render loop with performance tracking
                 engine.runRenderLoop(function() {
                     trackFrame();
-                    scene.render();
+                    if (scene) {
+                        scene.render();
+                    }
                 });
 
-                // Handle resize
                 window.addEventListener('resize', function() {
-                    engine.resize();
+                    if (engine) {
+                        engine.resize();
+                    }
                 });
 
-                // Ensure initial resize is called
                 engine.resize();
 
                 console.log('Rendering module initialized successfully');
@@ -578,6 +473,14 @@
                 return true;
             } catch (e) {
                 console.error('Failed to initialize rendering:', e);
+                if (scene) {
+                    scene.dispose();
+                    scene = null;
+                }
+                if (engine) {
+                    engine.dispose();
+                    engine = null;
+                }
                 return false;
             }
         },
@@ -626,19 +529,16 @@
         createAxes: function() {
             const axisLength = 3;
             
-            // X axis - red
             const xAxis = BABYLON.MeshBuilder.CreateLines("xAxis", {
                 points: [BABYLON.Vector3.Zero(), new BABYLON.Vector3(axisLength, 0, 0)]
             }, scene);
             xAxis.color = new BABYLON.Color3(1, 0.2, 0.2);
 
-            // Y axis - green
             const yAxis = BABYLON.MeshBuilder.CreateLines("yAxis", {
                 points: [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, axisLength, 0)]
             }, scene);
             yAxis.color = new BABYLON.Color3(0.2, 1, 0.2);
 
-            // Z axis - blue
             const zAxis = BABYLON.MeshBuilder.CreateLines("zAxis", {
                 points: [BABYLON.Vector3.Zero(), new BABYLON.Vector3(0, 0, axisLength)]
             }, scene);
@@ -647,21 +547,20 @@
             axesHelper = { x: xAxis, y: yAxis, z: zAxis };
         },
 
-        /**
-         * Create a rigid mesh using the registry pattern (OCP compliant)
-         */
         createRigidMesh: function(data) {
             console.log('Creating rigid mesh:', data.id, data.primitiveType);
             
-            // Use registry to get creator (OCP - no switch statement)
+            if (!scene) {
+                console.error('Cannot create mesh: scene not initialized. Call initialize() first.');
+                throw new Error('Scene not initialized. Call RenderingModule.initialize() before creating meshes.');
+            }
+            
             const creator = meshCreators[data.primitiveType] || meshCreators.sphere;
             const mesh = creator(data.id, scene, data.meshOptions || {});
 
-            // Use registry for material (OCP - no switch statement)
             const materialCreator = materialCreators[data.materialPreset] || materialCreators.default;
             mesh.material = materialCreator(data.id, scene);
 
-            // Apply transform
             if (data.position) {
                 mesh.position = new BABYLON.Vector3(
                     data.position[0],
@@ -687,7 +586,6 @@
                 );
             }
 
-            // Shadows
             if (shadowGenerator) {
                 shadowGenerator.addShadowCaster(mesh);
                 mesh.receiveShadows = true;
@@ -697,25 +595,19 @@
             console.log('Rigid mesh created successfully');
         },
 
-        /**
-         * Create material using registry (OCP compliant)
-         * @deprecated Use materialCreators registry directly
-         */
-        createMaterial: function(id, preset) {
-            const creator = materialCreators[preset] || materialCreators.default;
-            return creator(id, scene);
-        },
-
         createSoftMesh: function(data) {
             console.log('Creating soft mesh:', data.id, data.type);
             
+            if (!scene) {
+                console.error('Cannot create soft mesh: scene not initialized. Call initialize() first.');
+                throw new Error('Scene not initialized. Call RenderingModule.initialize() before creating meshes.');
+            }
+            
             const type = (data.type || 'cloth').toLowerCase();
             
-            // Use registry to create mesh (OCP compliant)
             const meshCreator = softMeshCreators[type] || softMeshCreators.cloth;
             const mesh = meshCreator(data.id, scene, data);
 
-            // Apply position
             if (data.position) {
                 mesh.position = new BABYLON.Vector3(
                     data.position[0],
@@ -724,17 +616,14 @@
                 );
             }
 
-            // Use registry for material (OCP compliant)
             const materialCreator = softMaterialCreators[type] || softMaterialCreators.default;
             mesh.material = materialCreator(data.id, scene, data);
 
-            // Enable shadows
             if (shadowGenerator) {
                 shadowGenerator.addShadowCaster(mesh);
                 mesh.receiveShadows = true;
             }
 
-            // Store mesh and its data
             softMeshes.set(data.id, mesh);
             softMeshData.set(data.id, {
                 type: type,
@@ -745,9 +634,6 @@
             console.log('Soft mesh created:', data.id, 'vertices:', mesh.getTotalVertices());
         },
 
-        /**
-         * Update mesh transform
-         */
         updateMeshTransform: function(id, position, rotation, scale) {
             const mesh = meshes.get(id);
             if (!mesh) return;
@@ -775,9 +661,6 @@
             }
         },
 
-        /**
-         * Update soft mesh vertices from physics simulation
-         */
         updateSoftMeshVertices: function(id, vertices, normals) {
             const mesh = softMeshes.get(id);
             if (!mesh) {
@@ -789,119 +672,39 @@
             if (!meshData) return;
 
             try {
-                // For cloth, we need to handle the vertex mapping
-                if (meshData.type === 'cloth') {
-                    this._updateClothVertices(mesh, vertices, normals);
-                } else if (meshData.type === 'volumetric') {
-                    this._updateVolumetricVertices(mesh, vertices, normals);
-                } else {
-                    // Generic update
+                const currentPositions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
+                if (!currentPositions) return;
+
+                const physicsVertexCount = vertices.length / 3;
+                const meshVertexCount = currentPositions.length / 3;
+
+                if (physicsVertexCount === meshVertexCount) {
                     mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(vertices));
-                    if (normals && normals.length > 0) {
-                        mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(normals));
+                } else {
+                    const updateCount = Math.min(physicsVertexCount, meshVertexCount);
+                    const newPositions = new Float32Array(currentPositions.length);
+                    
+                    for (let i = 0; i < updateCount * 3; i++) {
+                        newPositions[i] = vertices[i];
                     }
+                    for (let i = updateCount * 3; i < currentPositions.length; i++) {
+                        newPositions[i] = currentPositions[i];
+                    }
+                    
+                    mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, newPositions);
                 }
-            } catch (e) {
-                console.error('Error updating soft mesh vertices:', id, e);
-            }
-        },
 
-        /**
-         * Update cloth mesh vertices
-         */
-        _updateClothVertices: function(mesh, vertices, normals) {
-            const currentPositions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-            if (!currentPositions) return;
-
-            const physicsVertexCount = vertices.length / 3;
-            const meshVertexCount = currentPositions.length / 3;
-
-            if (physicsVertexCount === meshVertexCount) {
-                mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(vertices));
-            } else {
-                const updateCount = Math.min(physicsVertexCount, meshVertexCount);
-                const newPositions = new Float32Array(currentPositions.length);
-                
-                for (let i = 0; i < updateCount * 3; i++) {
-                    newPositions[i] = vertices[i];
-                }
-                for (let i = updateCount * 3; i < currentPositions.length; i++) {
-                    newPositions[i] = currentPositions[i];
-                }
-                
-                mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, newPositions);
-            }
-
-            if (normals && normals.length > 0) {
-                mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(normals));
-            } else {
-                const indices = mesh.getIndices();
-                const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-                const computedNormals = [];
-                BABYLON.VertexData.ComputeNormals(positions, indices, computedNormals);
-                mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(computedNormals));
-            }
-        },
-
-        /**
-         * Update volumetric mesh vertices
-         */
-        _updateVolumetricVertices: function(mesh, vertices, normals) {
-            const currentPositions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
-            if (!currentPositions) return;
-
-            const physicsVertexCount = vertices.length / 3;
-            const meshVertexCount = currentPositions.length / 3;
-
-            if (physicsVertexCount !== meshVertexCount) {
-                let cx = 0, cy = 0, cz = 0;
-                for (let i = 0; i < physicsVertexCount; i++) {
-                    cx += vertices[i * 3];
-                    cy += vertices[i * 3 + 1];
-                    cz += vertices[i * 3 + 2];
-                }
-                cx /= physicsVertexCount;
-                cy /= physicsVertexCount;
-                cz /= physicsVertexCount;
-
-                mesh.position.set(cx, cy, cz);
-                
-                let maxDist = 0;
-                for (let i = 0; i < physicsVertexCount; i++) {
-                    const dx = vertices[i * 3] - cx;
-                    const dy = vertices[i * 3 + 1] - cy;
-                    const dz = vertices[i * 3 + 2] - cz;
-                    maxDist = Math.max(maxDist, Math.sqrt(dx*dx + dy*dy + dz*dz));
-                }
-                
-                const originalRadius = mesh.getBoundingInfo().boundingSphere.radius;
-                if (originalRadius > 0 && maxDist > 0) {
-                    const scale = maxDist / originalRadius;
-                    mesh.scaling.setAll(scale);
-                }
-            } else {
-                mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(vertices));
-                
                 if (normals && normals.length > 0) {
                     mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(normals));
                 } else {
                     const indices = mesh.getIndices();
+                    const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
                     const computedNormals = [];
-                    BABYLON.VertexData.ComputeNormals(vertices, indices, computedNormals);
+                    BABYLON.VertexData.ComputeNormals(positions, indices, computedNormals);
                     mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(computedNormals));
                 }
-            }
-        },
-
-        /**
-         * Batch update multiple soft meshes (performance optimization)
-         */
-        updateAllSoftMeshVertices: function(vertexDataMap) {
-            for (const id in vertexDataMap) {
-                const data = vertexDataMap[id];
-                if (data && data.vertices && data.vertices.length > 0) {
-                    this.updateSoftMeshVertices(id, data.vertices, data.normals);
-                }
+            } catch (e) {
+                console.error('Error updating soft mesh vertices:', id, e);
             }
         },
 
@@ -985,13 +788,59 @@
             }
         },
 
+        getRendererInfo: function() {
+            return { ...rendererInfo };
+        },
+
+        getActiveBackend: function() {
+            return activeBackend;
+        },
+
+        getPerformanceMetrics: function() {
+            if (window.WebGPUModule) {
+                return window.WebGPUModule.getPerformanceMetrics();
+            }
+            
+            return {
+                backend: activeBackend,
+                fps: engine ? engine.getFps() : 0,
+                frameTimeMs: engine ? 1000 / engine.getFps() : 0
+            };
+        },
+
+        detectBackends: async function() {
+            if (window.WebGPUModule) {
+                return await window.WebGPUModule.getAllCapabilities();
+            }
+            
+            const webgpuSupported = !!navigator.gpu;
+            const canvas = document.createElement('canvas');
+            const webgl2Supported = !!canvas.getContext('webgl2');
+            const webglSupported = !!canvas.getContext('webgl');
+            
+            return {
+                webgpu: { isSupported: webgpuSupported },
+                webgl2: { isSupported: webgl2Supported },
+                webgl: { isSupported: webglSupported }
+            };
+        },
+
+        runBenchmark: async function(canvasId) {
+            if (window.WebGPUModule) {
+                return await window.WebGPUModule.runBenchmark(canvasId);
+            }
+            return { error: 'WebGPU module not loaded' };
+        },
+
         dispose: function() {
             if (fpsUpdateInterval) {
                 clearInterval(fpsUpdateInterval);
             }
             if (engine) {
                 engine.dispose();
+                engine = null;
             }
+            scene = null;
             meshes.clear();
             softMeshes.clear();
             softMeshData.clear();
@@ -999,5 +848,5 @@
         }
     };
 
-    console.log('Rendering module loaded, RenderingModule:', typeof window.RenderingModule);
+    console.log('RenderingModule loaded successfully');
 })();

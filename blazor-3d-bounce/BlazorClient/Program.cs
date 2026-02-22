@@ -19,7 +19,37 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 #region Core Services (DIP - depend on abstractions)
 
 builder.Services.AddScoped<IRenderingService, RenderingService>();
-builder.Services.AddScoped<IRigidPhysicsService, RigidPhysicsService>();
+
+// CPU physics (fallback for when GPU is unavailable)
+builder.Services.AddScoped<CpuPhysicsService>();
+
+// CPU-based rigid physics (original implementation)
+builder.Services.AddScoped<RigidPhysicsService>();
+
+// GPU physics configuration
+builder.Services.AddSingleton<GpuPhysicsConfig>(sp => new GpuPhysicsConfig
+{
+    MaxBodies = 16384,
+    MaxContacts = 65536,
+    SolverIterations = 8,
+    GridCellSize = 2.0f,
+    EnableCCD = false,
+    EnableWarmStarting = true,
+    EnableCpuFallback = true
+});
+
+// GPU-accelerated physics with CPU fallback
+builder.Services.AddScoped<IGpuPhysicsService>(sp =>
+{
+    var jsRuntime = sp.GetRequiredService<Microsoft.JSInterop.IJSRuntime>();
+    var cpuFallback = sp.GetRequiredService<CpuPhysicsService>();
+    var config = sp.GetRequiredService<GpuPhysicsConfig>();
+    return new GpuPhysicsService(jsRuntime, cpuFallback, config);
+});
+
+// Register GPU physics as the primary rigid physics service
+builder.Services.AddScoped<IRigidPhysicsService>(sp => sp.GetRequiredService<IGpuPhysicsService>());
+
 builder.Services.AddScoped<ISoftPhysicsService, SoftPhysicsService>();
 builder.Services.AddScoped<IInteropService, InteropService>();
 builder.Services.AddScoped<ISceneStateService, SceneStateService>();

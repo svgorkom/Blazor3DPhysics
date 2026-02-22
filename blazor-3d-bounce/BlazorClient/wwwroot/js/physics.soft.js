@@ -462,7 +462,9 @@
 
         // Batched version for all bodies - single call
         getAllPositions: function() {
-            if (bodyCount === 0) return null;
+            if (bodyCount === 0) {
+                return null;
+            }
             const result = {};
             for (let i = 0; i < bodyCount; i++) {
                 const id = bodyIds[i];
@@ -473,7 +475,9 @@
 
         // Legacy compatibility - with Array conversion
         getAllDeformedVertices: function() {
-            if bodyCount === 0) return {};
+            if (bodyCount === 0) {
+                return {};
+            }
             const result = {};
             for (let i = 0; i < bodyCount; i++) {
                 const id = bodyIds[i];
@@ -501,8 +505,12 @@
         },
 
         dispose: function() {
-            for (const id in softBodies) delete softBodies[id];
-            for (const id in initialStates) delete initialStates[id];
+            for (const id in softBodies) {
+                delete softBodies[id];
+            }
+            for (const id in initialStates) {
+                delete initialStates[id];
+            }
             bodyIds = [];
             bodyCount = 0;
             outputBuffer = null;
@@ -510,8 +518,16 @@
             _isInitialized = false;
         },
 
-        isAvailable: function() { return _isAvailable; },
-        getSoftBodyCount: function() { return bodyCount; },
-        getSoftBodyIds: function() { return bodyIds.slice(); }
+        isAvailable: function() { 
+            return _isAvailable; 
+        },
+        
+        getSoftBodyCount: function() { 
+            return bodyCount; 
+        },
+        
+        getSoftBodyIds: function() { 
+            return bodyIds.slice(); 
+        }
     };
 })();

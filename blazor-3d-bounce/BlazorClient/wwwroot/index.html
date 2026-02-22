@@ -34,13 +34,16 @@
     </div>
     
     <!-- WebGPU detection and metrics (load first to enable backend selection) -->
-    <script src="js/rendering.webgpu.js"></script>
+    <script src="js/rendering.webgpu.js?v=5"></script>
+    
+    <!-- GPU Physics Compute Module (WebGPU-based physics) -->
+    <script src="js/physics.gpu.js?v=5"></script>
     
     <!-- Application JS Modules - loaded before Blazor to ensure they're available -->
-    <script src="js/rendering.js"></script>
-    <script src="js/physics.rigid.js"></script>
-    <script src="js/physics.soft.js"></script>
-    <script src="js/interop.js"></script>
+    <script src="js/rendering.js?v=5"></script>
+    <script src="js/physics.rigid.js?v=5"></script>
+    <script src="js/physics.soft.js?v=5"></script>
+    <script src="js/interop.js?v=5"></script>
     
     <script src="_framework/blazor.webassembly.js"></script>
 </body>

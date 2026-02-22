@@ -1,0 +1,308 @@
+@page "/physics-demo"
+@using BlazorClient.Services
+@using BlazorClient.Domain.Models
+@inject IGpuPhysicsService PhysicsService
+@inject IRenderingService RenderingService
+@implements IAsyncDisposable
+
+<PageTitle>GPU Physics Demo</PageTitle>
+
+<div class="demo-container">
+    <div class="controls">
+        <h3>GPU Physics Demo</h3>
+        
+        <div class="status">
+            <span class="@(IsGpuActive ? "gpu-active" : "cpu-active")">
+                @(IsGpuActive ? "🚀 GPU Physics" : "💻 CPU Fallback")
+            </span>
+        </div>
+        
+        <div class="metrics">
+            <div>Bodies: @BodyCount</div>
+            <div>Contacts: @ContactCount</div>
+            <div>Physics: @PhysicsTimeMs.ToString("F2")ms</div>
+            <div>FPS: @Fps.ToString("F0")</div>
+        </div>
+        
+        <div class="actions">
+            <button @onclick="SpawnSphere">+ Sphere</button>
+            <button @onclick="SpawnBox">+ Box</button>
+            <button @onclick="Spawn100">+ 100 Spheres</button>
+            <button @onclick="Spawn1000" disabled="@(!IsGpuActive)">+ 1000 Spheres</button>
+            <button @onclick="Reset">Reset</button>
+            <button @onclick="@(() => IsPaused = !IsPaused)">
+                @(IsPaused ? "▶ Play" : "⏸ Pause")
+            </button>
+        </div>
+    </div>
+    
+    <canvas id="physics-canvas" @ref="canvasRef"></canvas>
+</div>
+
+@code {
+    private ElementReference canvasRef;
+    private bool _initialized;
+    private bool _disposed;
+    private System.Threading.Timer? _updateTimer;
+    
+    // State
+    private int BodyCount;
+    private int ContactCount;
+    private float PhysicsTimeMs;
+    private float Fps;
+    private bool IsGpuActive;
+    private bool IsPaused;
+    private int _spawnCounter;
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            await InitializePhysics();
+            _initialized = true;
+            
+            // Start update loop
+            _updateTimer = new System.Threading.Timer(
+                async _ => await UpdateLoop(),
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromMilliseconds(16.67)); // 60 FPS
+        }
+    }
+    
+    private async Task InitializePhysics()
+    {
+        // Initialize physics
+        var settings = new SimulationSettings
+        {
+            Gravity = new Vector3(0, -9.81f, 0),
+            TimeStep = 1f / 120f,
+            SubSteps = 3
+        };
+        
+        await PhysicsService.InitializeAsync(settings);
+        await PhysicsService.CreateGroundAsync(0.3f, 0.5f);
+        
+        // Initialize rendering
+        await RenderingService.InitializeAsync("physics-canvas", new RenderSettings
+        {
+            EnableShadows = true,
+            ShowGrid = true
+        });
+        
+        // Check if GPU is active
+        IsGpuActive = await PhysicsService.IsGpuAvailableAsync();
+        
+        // Create initial scene
+        await SpawnSphere();
+    }
+    
+    private async Task UpdateLoop()
+    {
+        if (_disposed || IsPaused) return;
+        
+        try
+        {
+            // Step physics
+            await PhysicsService.StepAsync(1f / 60f);
+            
+            // Get transforms and update rendering
+            var batch = await PhysicsService.GetTransformBatchAsync();
+            // In real app, this would update mesh transforms
+            
+            // Update metrics
+            var metrics = await PhysicsService.GetMetricsAsync();
+            BodyCount = metrics.BodyCount;
+            ContactCount = metrics.ContactCount;
+            PhysicsTimeMs = metrics.TotalStepTimeMs;
+            IsGpuActive = metrics.IsGpuActive;
+            
+            // Calculate FPS
+            Fps = PhysicsTimeMs > 0 ? 1000f / PhysicsTimeMs : 60f;
+            Fps = Math.Min(Fps, 144f);
+            
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Update error: {ex.Message}");
+        }
+    }
+    
+    private async Task SpawnSphere()
+    {
+        var id = $"sphere-{_spawnCounter++}";
+        var x = Random.Shared.NextSingle() * 4 - 2;
+        var z = Random.Shared.NextSingle() * 4 - 2;
+        
+        var sphere = new RigidBody(RigidPrimitiveType.Sphere, MaterialPreset.Rubber)
+        {
+            Id = id,
+            Mass = 1.0f,
+            Transform = new TransformData
+            {
+                Position = new Vector3(x, 5 + Random.Shared.NextSingle() * 5, z),
+                Scale = new Vector3(1, 1, 1)
+            }
+        };
+        
+        await PhysicsService.CreateRigidBodyAsync(sphere);
+        await RenderingService.CreateRigidMeshAsync(sphere);
+    }
+    
+    private async Task SpawnBox()
+    {
+        var id = $"box-{_spawnCounter++}";
+        var x = Random.Shared.NextSingle() * 4 - 2;
+        var z = Random.Shared.NextSingle() * 4 - 2;
+        
+        var box = new RigidBody(RigidPrimitiveType.Box, MaterialPreset.Wood)
+        {
+            Id = id,
+            Mass = 1.5f,
+            Transform = new TransformData
+            {
+                Position = new Vector3(x, 5 + Random.Shared.NextSingle() * 5, z),
+                Scale = new Vector3(1, 1, 1)
+            }
+        };
+        
+        await PhysicsService.CreateRigidBodyAsync(box);
+        await RenderingService.CreateRigidMeshAsync(box);
+    }
+    
+    private async Task Spawn100()
+    {
+        for (int i = 0; i < 100; i++)
+        {
+            await SpawnSphere();
+            
+            // Yield every 10 to keep UI responsive
+            if (i % 10 == 0)
+            {
+                await Task.Yield();
+            }
+        }
+    }
+    
+    private async Task Spawn1000()
+    {
+        for (int i = 0; i < 1000; i++)
+        {
+            await SpawnSphere();
+            
+            if (i % 50 == 0)
+            {
+                await Task.Yield();
+            }
+        }
+    }
+    
+    private async Task Reset()
+    {
+        await PhysicsService.ResetAsync();
+        _spawnCounter = 0;
+        BodyCount = 0;
+        ContactCount = 0;
+        
+        // Spawn one sphere to start
+        await SpawnSphere();
+    }
+    
+    public async ValueTask DisposeAsync()
+    {
+        _disposed = true;
+        _updateTimer?.Dispose();
+        
+        if (PhysicsService is IAsyncDisposable disposable)
+        {
+            await disposable.DisposeAsync();
+        }
+        
+        await RenderingService.DisposeAsync();
+    }
+}
+
+<style>
+    .demo-container {
+        display: flex;
+        height: 100vh;
+        background: #1a1a2e;
+        color: white;
+    }
+    
+    .controls {
+        width: 300px;
+        padding: 20px;
+        background: #16213e;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .status {
+        padding: 10px;
+        border-radius: 8px;
+        text-align: center;
+        font-weight: bold;
+    }
+    
+    .gpu-active {
+        background: linear-gradient(135deg, #00b894, #00cec9);
+        color: white;
+    }
+    
+    .cpu-active {
+        background: linear-gradient(135deg, #fdcb6e, #e17055);
+        color: white;
+    }
+    
+    .metrics {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding: 15px;
+        background: #0f3460;
+        border-radius: 8px;
+    }
+    
+    .metrics div {
+        padding: 5px;
+        text-align: center;
+        background: rgba(255,255,255,0.1);
+        border-radius: 4px;
+    }
+    
+    .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .actions button {
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        background: #e94560;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+        transition: transform 0.1s, background 0.2s;
+    }
+    
+    .actions button:hover:not(:disabled) {
+        background: #ff6b6b;
+        transform: scale(1.02);
+    }
+    
+    .actions button:disabled {
+        background: #444;
+        cursor: not-allowed;
+    }
+    
+    #physics-canvas {
+        flex: 1;
+        width: 100%;
+        height: 100%;
+    }
+</style>
