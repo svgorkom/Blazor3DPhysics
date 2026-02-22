@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using BlazorClient.Domain.Common;
 using BlazorClient.Models;
 
 namespace BlazorClient.Services;

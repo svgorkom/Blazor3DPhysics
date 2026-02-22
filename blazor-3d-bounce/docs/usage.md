@@ -13,19 +13,19 @@ This guide explains how to use the Blazor 3D Physics application.
 ### Interface Overview
 
 ```
-???????????????????????????????????????????????????????????????????????
-?  ?? Blazor 3D Physics  ? ?? ?? ?? ? Spawn ? Presets ?     ? ? Toolbar
-???????????????????????????????????????????????????????????????????????
-?             ?                                   ?                   ?
-?  Spawn      ?                                   ?   Inspector       ?
-?  Panel      ?         3D Viewport               ?    Panel          ?
-?             ?                                   ?                   ?
-?  Object     ?                                   ?  Properties       ?
-?  List       ?                                   ?   Settings        ?
-?             ?                                   ?                   ?
-???????????????????????????????????????????????????????????????????????
-?  FPS: 60 ? Physics: 2.1ms ? Rigid: 5 ? Soft: 2             ? ? Stats
-???????????????????????????????????????????????????????????????????????
+┌────────────────────────────────────────────────────────────────────────────┐
+│  🎮 Blazor 3D Physics  │ ▶️ ⏸️ 🔄 │ Spawn │ Presets │     │ ← Toolbar      │
+├────────────────────────────────────────────────────────────────────────────┤
+│             │                                   │                          │
+│  Spawn      │                                   │   Inspector              │
+│  Panel      │         3D Viewport               │    Panel                 │
+│             │                                   │                          │
+│  Object     │                                   │  Properties              │
+│  List       │                                   │   Settings               │
+│             │                                   │                          │
+├────────────────────────────────────────────────────────────────────────────┤
+│  FPS: 60 │ Physics: 2.1ms │ Rigid: 5 │ Soft: 2             │ ← Stats       │
+└────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Spawning Objects
@@ -36,10 +36,10 @@ Click the spawn buttons in the toolbar or sidebar:
 
 | Button | Shape | Description |
 |--------|-------|-------------|
-| ? Sphere | Ball | Best for bouncing demos |
-| ?? Box | Cube | Good for stacking |
-| ?? Capsule | Pill shape | Character-like |
-| ??? Cylinder | Barrel | Rolls naturally |
+| ⚫ Sphere | Ball | Best for bouncing demos |
+| 🔲 Box | Cube | Good for stacking |
+| 💊 Capsule | Pill shape | Character-like |
+| 🛢️ Cylinder | Barrel | Rolls naturally |
 
 Objects spawn at a random position above the ground plane.
 
@@ -47,9 +47,9 @@ Objects spawn at a random position above the ground plane.
 
 | Button | Type | Description |
 |--------|------|-------------|
-| ?? Cloth | Fabric | Falls and drapes |
-| ?? Rope | Chain | Hangs from pinned top |
-| ?? Jelly | Volume | Bouncy, squishy ball |
+| 🧵 Cloth | Fabric | Falls and drapes |
+| 🪢 Rope | Chain | Hangs from pinned top |
+| 🫧 Jelly | Volume | Bouncy, squishy ball |
 
 **Note**: Soft body buttons are disabled if Ammo.js fails to load.
 
@@ -77,13 +77,13 @@ Objects spawn at a random position above the ground plane.
 
 ### Play/Pause
 
-- Click **??** to start simulation
-- Click **??** to pause
+- Click **▶️** to start simulation
+- Click **⏸️** to pause
 - When paused, objects freeze in place
 
 ### Reset
 
-- Click **??** to clear all objects and restart
+- Click **🔄** to clear all objects and restart
 - Returns to initial state
 
 ### Step

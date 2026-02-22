@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>BlazorClient.Infrastructure.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BlazorClient.Infrastructure\BlazorClient.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\BlazorClient.Application\BlazorClient.Application.csproj" />
+    <ProjectReference Include="..\..\BlazorClient.Domain\BlazorClient.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

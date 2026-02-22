@@ -3,9 +3,12 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using BlazorClient;
 using BlazorClient.Services;
 using BlazorClient.Services.Factories;
-using BlazorClient.Services.Events;
 using BlazorClient.Services.Commands;
-using BlazorClient.Services.Validation;
+using BlazorClient.Application.Commands;
+using BlazorClient.Application.Events;
+using BlazorClient.Application.Validation;
+using BlazorClient.Infrastructure.Events;
+using BlazorClient.Infrastructure.Validation;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");

@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/blazor-3d-bounce/">
+    <Project Path="blazor-3d-bounce/BlazorClient.Application/BlazorClient.Application.csproj" />
+    <Project Path="blazor-3d-bounce/BlazorClient.Domain/BlazorClient.Domain.csproj" />
+    <Project Path="blazor-3d-bounce/BlazorClient.Infrastructure/BlazorClient.Infrastructure.csproj" />
+  </Folder>
   <Folder Name="/BlazorClient/">
     <Project Path="blazor-3d-bounce/BlazorClient/BlazorClient.csproj" />
   </Folder>
@@ -8,6 +13,10 @@
     <File Path="blazor-3d-bounce/docs/physics.md" />
     <File Path="blazor-3d-bounce/docs/softbody.md" />
     <File Path="blazor-3d-bounce/docs/usage.md" />
+    <File Path="blazor-3d-bounce/docs/DEVELOPER_QUICK_REFERENCE.md" />
+    <File Path="blazor-3d-bounce/docs/ENCODING_GUIDE.md" />
+    <File Path="blazor-3d-bounce/docs/how-it-works.md" />
+    <File Path="blazor-3d-bounce/docs/IMPROVEMENTS_IMPLEMENTED.md" />
     <File Path="blazor-3d-bounce/docs/perf-tuning.md" />
     <File Path="blazor-3d-bounce/docs/roadmap.md" />
   </Folder>
@@ -20,5 +29,12 @@
   </Folder>
   <Folder Name="/Solution Items/">
     <File Path="CLAUDE.md" />
+    <File Path="Directory.Build.props" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="blazor-3d-bounce/Tests/BlazorClient.Application.Tests/BlazorClient.Application.Tests.csproj" />
+    <Project Path="blazor-3d-bounce/Tests/BlazorClient.Domain.Tests/BlazorClient.Domain.Tests.csproj" />
+    <Project Path="blazor-3d-bounce/Tests/BlazorClient.Infrastructure.Tests/BlazorClient.Infrastructure.Tests.csproj" />
+    <Project Path="blazor-3d-bounce/Tests/BlazorClient.Tests/BlazorClient.Tests.csproj" />
   </Folder>
 </Solution>

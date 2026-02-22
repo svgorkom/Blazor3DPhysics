@@ -2,6 +2,65 @@
 
 This document describes the system architecture of the Blazor 3D Physics application.
 
+## Project Structure
+
+The solution follows Clean Architecture principles with clear separation of concerns:
+
+```
+Blazor3DPhysics.sln
+├── BlazorClient.Domain/          # Domain Layer (no dependencies)
+│   ├── Models/                   # Domain entities and value objects
+│   │   ├── PhysicsTypes.cs      # Vector3, Quaternion, Materials, Presets
+│   │   └── SceneObjects.cs      # RigidBody, SoftBody, SimulationSettings
+│   └── Common/                   # Shared domain types
+│       └── Result.cs            # Result pattern for functional error handling
+│
+├── BlazorClient.Application/     # Application Layer (depends on Domain)
+│   ├── Commands/                 # CQRS command definitions
+│   │   ├── CommandInterfaces.cs # ICommand, ICommandHandler, ICommandDispatcher
+│   │   └── CommandDispatcher.cs # Command dispatcher implementation
+│   ├── Events/                   # Domain events
+│   │   ├── IEventAggregator.cs  # Event aggregator interface
+│   │   └── DomainEvents.cs      # Event definitions
+│   └── Validation/              # Business rule validation
+│       └── IPhysicsValidator.cs # Physics parameter validation interface
+│
+├── BlazorClient.Infrastructure/  # Infrastructure Layer (depends on Application)
+│   ├── Events/                   # Event aggregator implementation
+│   │   └── EventAggregator.cs   # Pub/sub event system
+│   └── Validation/              # Validation implementations
+│       └── PhysicsValidator.cs  # Physics parameter validation
+│
+└── BlazorClient/                 # UI Layer (Blazor WebAssembly)
+    ├── Pages/                    # Razor pages
+    │   └── Index.razor          # Main application page
+    ├── Components/              # Reusable Blazor components
+    │   ├── Viewport.razor       # 3D canvas host
+    │   ├── Toolbar.razor        # Control toolbar
+    │   ├── Inspector.razor      # Property editor
+    │   └── Stats.razor          # Performance statistics
+    ├── Services/                # Service implementations (will be moved to Infrastructure)
+    │   ├── Commands/            # Command handlers
+    │   ├── Interfaces/          # Service interfaces
+    │   ├── Factories/           # Factory patterns
+    │   └── ...                  # Various services
+    ├── Models/                  # Backwards compatibility aliases
+    └── wwwroot/                 # Static assets and JavaScript
+        └── js/                  # JavaScript interop modules
+```
+
+### Dependency Flow
+
+```
+BlazorClient (UI)
+    ↓
+BlazorClient.Infrastructure
+    ↓
+BlazorClient.Application
+    ↓
+BlazorClient.Domain (no dependencies)
+```
+
 ## SOLID Principles Compliance
 
 This codebase follows all five SOLID principles:
@@ -14,6 +73,168 @@ This codebase follows all five SOLID principles:
 | **I**nterface Segregation | Soft body interfaces split: `IClothPhysicsService`, `IRopePhysicsService`, etc. |
 | **D**ependency Inversion | All components depend on abstractions (interfaces), not concrete implementations |
 
+## High-Level Architecture
+
+```mermaid
+flowchart TB
+    subgraph UI["UI Layer (BlazorClient)"]
+        Pages[Razor Pages]
+        Components[Blazor Components]
+    end
+
+    subgraph Application["Application Layer (BlazorClient.Application)"]
+        Commands[Command Handlers]
+        Events[Event Interfaces]
+        Validation[Validator Interfaces]
+    end
+
+    subgraph Domain["Domain Layer (BlazorClient.Domain)"]
+        Models[Domain Models]
+        ValueObjects[Value Objects]
+        Results[Result Types]
+    end
+
+    subgraph Infrastructure["Infrastructure Layer (BlazorClient.Infrastructure)"]
+        EventImpl[Event Aggregator]
+        ValidatorImpl[Validators]
+        Physics[Physics Services]
+        Rendering[Rendering Service]
+        Interop[JS Interop]
+    end
+
+    subgraph External["External (JavaScript)"]
+        Babylon[Babylon.js]
+        Rapier[Rapier.js]
+        Ammo[Ammo.js]
+    end
+
+    UI --> Application
+    UI --> Infrastructure
+    Application --> Domain
+    Infrastructure --> Application
+    Infrastructure --> Domain
+    Infrastructure --> External
+```
+
+## Component Architecture
+
+### Domain Layer (BlazorClient.Domain)
+
+```
+BlazorClient.Domain/
+├── Models/
+│   ├── PhysicsTypes.cs       # Vector3, Quaternion, TransformData
+│   │                        # MaterialPreset, PhysicsMaterial
+│   │                        # SoftBodyType, SoftBodyMaterial
+│   └── SceneObjects.cs      # SceneObject, RigidBody, SoftBody
+│                            # SimulationSettings, RenderSettings
+│                            # PerformanceStats, ScenePreset
+└── Common/
+    └── Result.cs            # Result<T>, Result (functional error handling)
+```
+
+**Key Characteristics:**
+- No external dependencies
+- Pure domain logic
+- Immutable value objects where appropriate
+- Business rules enforced in constructors and methods
+
+### Application Layer (BlazorClient.Application)
+
+```
+BlazorClient.Application/
+├── Commands/
+│   ├── CommandInterfaces.cs     # ICommand, ICommand<TResult>
+│   │                            # ICommandHandler<TCommand>
+│   │                            # ICommandHandler<TCommand, TResult>
+│   │                            # ICommandDispatcher
+│   │                            # Command definitions (SpawnRigidBodyCommand, etc.)
+│   └── CommandDispatcher.cs     # CommandDispatcher implementation
+├── Events/
+│   ├── IEventAggregator.cs      # Event aggregator interface
+│   └── DomainEvents.cs          # Event, IEventHandler<TEvent>
+│                                # ObjectSpawnedEvent, etc.
+└── Validation/
+    └── IPhysicsValidator.cs     # ValidationResult, IPhysicsValidator
+```
+
+**Key Characteristics:**
+- Defines application use cases via commands
+- Declares domain events
+- Validation interfaces
+- Depends only on Domain layer
+
+### Infrastructure Layer (BlazorClient.Infrastructure)
+
+```
+BlazorClient.Infrastructure/
+├── Events/
+│   └── EventAggregator.cs       # Pub/sub implementation
+└── Validation/
+    └── PhysicsValidator.cs      # Physics validation implementation
+```
+
+**Key Characteristics:**
+- Implements Application interfaces
+- Handles external integrations (JS Interop, etc.)
+- Service implementations
+- Depends on Application and Domain layers
+
+### UI Layer (BlazorClient)
+
+```
+BlazorClient/
+├── Pages/
+│   └── Index.razor              # Main page, UI coordination only (SRP)
+├── Components/
+│   ├── Viewport.razor           # Canvas host
+│   ├── Toolbar.razor            # Spawn controls, playback
+│   ├── Inspector.razor          # Property editing
+│   └── Stats.razor              # Performance display
+├── Services/                    # (Many will move to Infrastructure)
+│   ├── Interfaces/
+│   │   └── IPhysicsInterfaces.cs # Segregated physics interfaces (ISP)
+│   ├── Factories/
+│   │   ├── MeshCreatorFactory.cs    # Extensible mesh creation (OCP)
+│   │   └── MaterialCreatorFactory.cs # Extensible material creation (OCP)
+│   ├── Commands/
+│   │   ├── CommandHandlers.cs       # Command handler implementations
+│   │   └── LoggingCommandDispatcher.cs # Decorator for logging
+│   ├── SimulationLoopService.cs  # Physics loop timing only (SRP)
+│   ├── RenderingService.cs       # Babylon.js wrapper
+│   ├── PhysicsService.Rigid.cs   # Rapier wrapper (implements IPhysicsService)
+│   ├── PhysicsService.Soft.cs    # Ammo wrapper (implements segregated interfaces)
+│   ├── InteropService.cs         # Batched JS calls
+│   ├── SceneStateService.cs      # Central state
+│   ├── SceneSerializationService.cs # Scene import/export
+│   ├── PerformanceMonitor.cs     # Performance tracking
+│   ├── ObjectPool.cs             # Array/object pooling
+│   └── JsModuleCache.cs          # JS module caching
+├── Models/                       # Backwards compatibility (global usings)
+│   ├── PhysicsTypes.cs          # Aliases to Domain.Models
+│   ├── SceneObjects.cs          # Aliases to Domain.Models
+│   └── Result.cs                # Alias to Domain.Common
+└── wwwroot/
+    └── js/
+        ├── rendering.js       # Babylon.js scene with registry pattern (OCP)
+        ├── physics.rigid.js   # Rapier world, bodies, colliders
+        ├── physics.soft.js    # Ammo soft body world
+        └── interop.js         # Bridge with dependency injection (DIP)
+```
+
+## Backwards Compatibility
+
+The original `BlazorClient/Models/` folder files now contain `global using` directives to maintain backwards compatibility:
+
+```csharp
+// BlazorClient/Models/PhysicsTypes.cs
+global using Vector3 = BlazorClient.Domain.Models.Vector3;
+global using Quaternion = BlazorClient.Domain.Models.Quaternion;
+// ... etc.
+```
+
+This allows existing code to continue working without modification while new code can use the proper namespaces.
+
 ## Architectural Patterns
 
 | Pattern | Implementation | Purpose |
@@ -23,101 +244,6 @@ This codebase follows all five SOLID principles:
 | **Result Pattern** | `Result<T>`, `Result` | Functional error handling |
 | **Object Pooling** | `ArrayPool<T>`, `ObjectPool<T>` | Reduces allocations in hot paths |
 | **Factory Pattern** | `IMeshCreatorFactory`, `IMaterialCreatorFactory` | Extensible object creation |
-
-## High-Level Architecture
-
-```mermaid
-flowchart TB
-    subgraph UI["UI Layer"]
-        Pages[Razor Pages]
-        Components[Blazor Components]
-    end
-
-    subgraph Application["Application Layer"]
-        Commands[Command Handlers]
-        Events[Event Aggregator]
-        Validation[Validators]
-    end
-
-    subgraph Domain["Domain Layer"]
-        SceneState[Scene State]
-        Models[Domain Models]
-    end
-
-    subgraph Infrastructure["Infrastructure Layer"]
-        Physics[Physics Services]
-        Rendering[Rendering Service]
-        Interop[JS Interop]
-        Serialization[Serialization]
-        Performance[Performance Monitor]
-    end
-
-    subgraph External["External (JavaScript)"]
-        Babylon[Babylon.js]
-        Rapier[Rapier.js]
-        Ammo[Ammo.js]
-    end
-
-    UI --> Commands
-    UI --> Events
-    Commands --> Domain
-    Commands --> Validation
-    Events --> UI
-    Domain --> Infrastructure
-    Infrastructure --> External
-```
-
-## Component Architecture
-
-### Blazor Layer (C#)
-
-```
-BlazorClient/
-??? Pages/
-?   ??? Index.razor              # Main page, UI coordination only (SRP)
-??? Components/
-?   ??? Viewport.razor           # Canvas host
-?   ??? Toolbar.razor            # Spawn controls, playback
-?   ??? Inspector.razor          # Property editing
-?   ??? Stats.razor              # Performance display
-??? Services/
-?   ??? Interfaces/
-?   ?   ??? IPhysicsInterfaces.cs # Segregated physics interfaces (ISP)
-?   ??? Factories/
-?   ?   ??? MeshCreatorFactory.cs    # Extensible mesh creation (OCP)
-?   ?   ??? MaterialCreatorFactory.cs # Extensible material creation (OCP)
-?   ??? Commands/
-?   ?   ??? CommandInterfaces.cs     # Command/Query definitions
-?   ?   ??? CommandHandlers.cs       # Command handler implementations
-?   ??? Events/
-?   ?   ??? EventAggregator.cs       # Pub/sub event system
-?   ??? Validation/
-?   ?   ??? PhysicsValidator.cs      # Physics parameter validation
-?   ??? SimulationLoopService.cs  # Physics loop timing only (SRP)
-?   ??? RenderingService.cs       # Babylon.js wrapper
-?   ??? PhysicsService.Rigid.cs   # Rapier wrapper (implements IPhysicsService)
-?   ??? PhysicsService.Soft.cs    # Ammo wrapper (implements segregated interfaces)
-?   ??? InteropService.cs         # Batched JS calls
-?   ??? SceneStateService.cs      # Central state
-?   ??? SceneSerializationService.cs # Scene import/export
-?   ??? PerformanceMonitor.cs     # Performance tracking
-?   ??? ObjectPool.cs             # Array/object pooling
-?   ??? JsModuleCache.cs          # JS module caching
-??? Models/
-    ??? PhysicsTypes.cs           # Value types, materials
-    ??? SceneObjects.cs           # Entity definitions
-    ??? Result.cs                 # Result pattern types
-```
-
-### JavaScript Layer
-
-```
-wwwroot/js/
-??? rendering.js       # Babylon.js scene with registry pattern (OCP)
-??? physics.rigid.js   # Rapier world, bodies, colliders
-??? physics.soft.js    # Ammo soft body world
-??? interop.js         # Bridge with dependency injection (DIP)
-```
 
 ## Command Pattern (CQRS-Lite)
 
@@ -257,7 +383,7 @@ Console.WriteLine($"FPS: {stats.Fps}, Physics: {stats.PhysicsTimeMs}ms");
 ```csharp
 // Get cached module reference
 var module = await _moduleCache.GetModuleAsync("./js/physics.rigid.js");
-await module.InvokeVoidAsync("step", deltaTime);
+await module.invokeVoidAsync("step", deltaTime);
 
 // Preload modules
 await _moduleCache.PreloadModulesAsync(

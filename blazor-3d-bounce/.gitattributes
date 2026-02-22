@@ -1,0 +1,51 @@
+# Git attributes for consistent line endings and encoding
+# https://git-scm.com/docs/gitattributes
+
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Explicitly declare text files to be normalized and converted to LF on checkin
+*.cs text eol=lf
+*.csproj text eol=lf
+*.sln text eol=lf
+*.razor text eol=lf
+*.cshtml text eol=lf
+*.json text eol=lf
+*.xml text eol=lf
+*.config text eol=lf
+*.props text eol=lf
+*.targets text eol=lf
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.sh text eol=lf
+
+# Markdown files - ensure UTF-8 encoding is preserved
+# This is critical for emoji and Unicode characters
+*.md text eol=lf encoding=utf-8 diff=markdown
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.zip binary
+*.dll binary
+*.exe binary
+*.wasm binary
+
+# Ensure consistent behavior for these common file types
+.editorconfig text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+Dockerfile text eol=lf
+LICENSE text eol=lf
+Makefile text eol=lf

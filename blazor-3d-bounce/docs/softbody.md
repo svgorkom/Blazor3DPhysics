@@ -65,10 +65,10 @@ Maintain edge lengths (structural integrity):
 
 ```
 o---------o
-   L?
+   L₀
 ```
 
-Force: `F = k � (|L| - L?) � direction`
+Force: `F = k × (|L| - L₀) × direction`
 
 ### Shear Constraints
 
@@ -89,7 +89,7 @@ Resist folding (maintains surface smoothness):
 
 ```
     o         o
-   /|\   ?   /|\
+   /|\   →   /|\
   / | \     / | \
  o  |  o   o--+--o
     |         | resists
@@ -101,7 +101,7 @@ Resist folding (maintains surface smoothness):
 Preserve internal volume through pressure:
 
 ```
-Pressure = k � (V? - V_current) / V?
+Pressure = k × (V₀ - V_current) / V₀
 ```
 
 ## Material Parameters
@@ -280,18 +280,18 @@ body.Material.CollisionMargin = 0.02f;  // 2cm
 
 | Resolution | Min Iterations | Recommended |
 |------------|----------------|-------------|
-| Low (10�10) | 5 | 8-10 |
-| Medium (25�25) | 8 | 10-15 |
-| High (50�50) | 10 | 15-20 |
+| Low (10×10) | 5 | 8-10 |
+| Medium (25×25) | 8 | 10-15 |
+| High (50×50) | 10 | 15-20 |
 
 ### Stiffness vs. Iterations
 
 Higher stiffness requires more iterations:
 
 ```
-stiffness = 0.5 ? iterations = 8-10
-stiffness = 0.9 ? iterations = 15-20
-stiffness = 0.99 ? iterations = 25+ (not recommended)
+stiffness = 0.5 → iterations = 8-10
+stiffness = 0.9 → iterations = 15-20
+stiffness = 0.99 → iterations = 25+ (not recommended)
 ```
 
 ### Avoiding Explosions
@@ -391,7 +391,7 @@ Normals should be recomputed for proper lighting:
 
 ### Resolution Trade-offs
 
-| Metric | Low Res (10�10) | High Res (50�50) |
+| Metric | Low Res (10×10) | High Res (50×50) |
 |--------|-----------------|------------------|
 | Vertices | 100 | 2500 |
 | Constraints | ~400 | ~10000 |

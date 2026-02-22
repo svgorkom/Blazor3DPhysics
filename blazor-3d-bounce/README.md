@@ -8,40 +8,40 @@
 
 A production-quality .NET 8 Blazor WebAssembly application featuring realistic 3D physics simulation with both **rigid bodies** (bouncing meshes with restitution/friction) and **soft bodies** (cloth, rope, and volumetric "jelly" objects).
 
-## ? Features
+## ✨ Features
 
 ### Rigid Body Physics (Rapier.js)
-- ?? Realistic bouncing with configurable restitution (bounciness)
-- ?? Static and dynamic friction simulation
-- ?? Linear and angular damping
-- ? Continuous Collision Detection (CCD) for fast-moving objects
-- ?? Automatic sleeping for performance optimization
-- ?? Multiple primitive shapes: Sphere, Box, Capsule, Cylinder, Cone
+- 🏀 Realistic bouncing with configurable restitution (bounciness)
+- 🧲 Static and dynamic friction simulation
+- 💨 Linear and angular damping
+- ⚡ Continuous Collision Detection (CCD) for fast-moving objects
+- 😴 Automatic sleeping for performance optimization
+- 🔷 Multiple primitive shapes: Sphere, Box, Capsule, Cylinder, Cone
 
 ### Soft Body Physics (Ammo.js)
-- ?? **Cloth**: Draped fabrics with structural, shear, and bending constraints
-- ?? **Rope**: Flexible chains with pin constraints
-- ?? **Volumetric**: Jelly-like deformable objects with pressure/volume preservation
-- ?? Vertex pinning for anchoring soft bodies
-- ?? Self-collision support
-- ?? Configurable stiffness, damping, and iterations
+- 🧵 **Cloth**: Draped fabrics with structural, shear, and bending constraints
+- 🪢 **Rope**: Flexible chains with pin constraints
+- 🫧 **Volumetric**: Jelly-like deformable objects with pressure/volume preservation
+- 📌 Vertex pinning for anchoring soft bodies
+- 💥 Self-collision support
+- ⚙️ Configurable stiffness, damping, and iterations
 
 ### Rendering (Babylon.js)
-- ?? PBR materials with metallic/roughness workflow
-- ?? HDR environment lighting and IBL
-- ?? Real-time shadow mapping
-- ?? Grid and axis helpers
-- ?? Object selection highlighting
-- ?? Wireframe visualization mode
+- 🎨 PBR materials with metallic/roughness workflow
+- 🌅 HDR environment lighting and IBL
+- 🔦 Real-time shadow mapping
+- 📐 Grid and axis helpers
+- 🔍 Object selection highlighting
+- 🕸️ Wireframe visualization mode
 
 ### User Interface
-- ??? Intuitive toolbar with spawn controls
-- ?? Inspector panel for object properties
-- ?? Real-time performance statistics (FPS, physics time)
-- ?? Dark theme with responsive design
-- ?? Keyboard accessible
+- 🛠️ Intuitive toolbar with spawn controls
+- 📋 Inspector panel for object properties
+- 📊 Real-time performance statistics (FPS, physics time)
+- 🌙 Dark theme with responsive design
+- ⌨️ Keyboard accessible
 
-## ?? Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
@@ -68,7 +68,7 @@ Open your browser and navigate to `https://localhost:5001` or `http://localhost:
 dotnet watch run --project BlazorClient/BlazorClient.csproj
 ```
 
-## ?? Controls
+## 🎮 Controls
 
 ### Mouse
 - **Left Click + Drag**: Rotate camera
@@ -83,53 +83,80 @@ dotnet watch run --project BlazorClient/BlazorClient.csproj
 - **G**: Toggle grid
 - **Delete**: Remove selected object
 
-## ?? Project Structure
+## 📁 Project Structure
+
+The solution follows **Clean Architecture** principles with clear separation of concerns:
 
 ```
 blazor-3d-bounce/
-??? BlazorClient/
-?   ??? BlazorClient.csproj      # Project file
-?   ??? Program.cs               # Entry point & DI setup
-?   ??? wwwroot/
-?   ?   ??? index.html           # HTML host
-?   ?   ??? css/site.css         # Styles
-?   ?   ??? js/
-?   ?   ?   ??? rendering.js     # Babylon.js rendering
-?   ?   ?   ??? physics.rigid.js # Rapier.js rigid bodies
-?   ?   ?   ??? physics.soft.js  # Ammo.js soft bodies
-?   ?   ?   ??? interop.js       # Blazor-JS bridge
-?   ?   ??? assets/              # HDRI, models
-?   ??? Components/
-?   ?   ??? Viewport.razor       # 3D canvas
-?   ?   ??? Inspector.razor      # Property editor
-?   ?   ??? Toolbar.razor        # Top toolbar
-?   ?   ??? Stats.razor          # Performance display
-?   ??? Services/
-?   ?   ??? RenderingService.cs  # Babylon.js wrapper
-?   ?   ??? PhysicsService.Rigid.cs # Rapier wrapper
-?   ?   ??? PhysicsService.Soft.cs  # Ammo wrapper
-?   ?   ??? InteropService.cs    # Batched interop
-?   ??? Models/
-?       ??? PhysicsTypes.cs      # Material definitions
-?       ??? SceneObjects.cs      # Body classes
-??? docs/
-?   ??? architecture.md          # System design
-?   ??? physics.md              # Rigid body physics
-?   ??? softbody.md             # Soft body physics
-?   ??? usage.md                # User guide
-?   ??? perf-tuning.md          # Performance tips
-?   ??? roadmap.md              # Future plans
-??? samples/
-?   ??? presets.json            # Material presets
-?   ??? scenes/
-?       ??? bounce-regression.json
-?       ??? cloth-over-sphere.json
-?       ??? rope-pendulum.json
-?       ??? jelly-drop.json
-??? README.md
+├── Blazor3DPhysics.sln          # Solution file
+├── BlazorClient.Domain/         # Domain Layer (no dependencies)
+│   ├── Models/                  # Domain entities
+│   │   ├── PhysicsTypes.cs     # Vector3, materials, presets
+│   │   └── SceneObjects.cs     # RigidBody, SoftBody, settings
+│   └── Common/
+│       └── Result.cs           # Functional error handling
+├── BlazorClient.Application/    # Application Layer
+│   ├── Commands/               # CQRS commands and handlers
+│   ├── Events/                 # Domain events
+│   └── Validation/             # Business rules
+├── BlazorClient.Infrastructure/ # Infrastructure Layer
+│   ├── Events/                 # Event aggregator implementation
+│   └── Validation/             # Validator implementations
+├── BlazorClient/               # UI Layer (Blazor WebAssembly)
+│   ├── Program.cs              # Entry point & DI setup
+│   ├── wwwroot/
+│   │   ├── index.html          # HTML host
+│   │   ├── css/site.css        # Styles
+│   │   ├── js/
+│   │   │   ├── rendering.js    # Babylon.js rendering
+│   │   │   ├── physics.rigid.js # Rapier.js rigid bodies
+│   │   │   ├── physics.soft.js  # Ammo.js soft bodies
+│   │   │   └── interop.js      # Blazor-JS bridge
+│   │   └── assets/             # HDRI, models
+│   ├── Components/
+│   │   ├── Viewport.razor      # 3D canvas
+│   │   ├── Inspector.razor     # Property editor
+│   │   ├── Toolbar.razor       # Top toolbar
+│   │   └── Stats.razor         # Performance display
+│   ├── Services/               # Service implementations
+│   │   ├── Commands/           # Command handlers
+│   │   ├── Interfaces/         # Service interfaces
+│   │   ├── Factories/          # Factory patterns
+│   │   ├── RenderingService.cs # Babylon.js wrapper
+│   │   ├── PhysicsService.Rigid.cs # Rapier wrapper
+│   │   ├── PhysicsService.Soft.cs  # Ammo wrapper
+│   │   └── ...
+│   └── Models/                 # Backwards compatibility aliases
+├── docs/
+│   ├── architecture.md         # System design (includes Clean Architecture details)
+│   ├── physics.md             # Rigid body physics
+│   ├── softbody.md            # Soft body physics
+│   ├── usage.md               # User guide
+│   ├── perf-tuning.md         # Performance tips
+│   └── roadmap.md             # Future plans
+├── samples/
+│   ├── presets.json           # Material presets
+│   └── scenes/
+│       ├── bounce-regression.json
+│       ├── cloth-over-sphere.json
+│       ├── rope-pendulum.json
+│       └── jelly-drop.json
+└── README.md
 ```
 
-## ?? Sample Scenes
+### Architecture Layers
+
+The solution is organized into four distinct projects following Clean Architecture:
+
+1. **Domain** (`BlazorClient.Domain`): Core business logic, entities, value objects (no dependencies)
+2. **Application** (`BlazorClient.Application`): Use cases, commands, events, validation interfaces
+3. **Infrastructure** (`BlazorClient.Infrastructure`): External integrations, service implementations
+4. **UI** (`BlazorClient`): Blazor WebAssembly components and pages
+
+See [architecture.md](docs/architecture.md) for detailed information about the layered architecture.
+
+## 🎬 Sample Scenes
 
 ### 1. Bounce Regression Test
 Tests restitution with geometrically decaying bounces. A sphere with e=0.8 should reach ~64% of previous height each bounce.
@@ -138,17 +165,17 @@ Tests restitution with geometrically decaying bounces. A sphere with e=0.8 shoul
 Cloth soft body draping over a static sphere, demonstrating natural fold formation.
 
 ### 3. Rope Pendulum
-Rope with pinned top vertex swinging as a pendulum. Period ? 2??(L/g).
+Rope with pinned top vertex swinging as a pendulum. Period ≈ 2π√(L/g).
 
 ### 4. Jelly Drop
 Volumetric soft body dropped on ground, showing pressure-based volume preservation.
 
-## ?? Configuration
+## ⚙️ Configuration
 
 ### Physics Settings
 | Setting | Default | Description |
 |---------|---------|-------------|
-| Gravity Y | -9.81 | Gravitational acceleration (m/s�) |
+| Gravity Y | -9.81 | Gravitational acceleration (m/s²) |
 | Time Step | 1/120 | Fixed physics timestep (s) |
 | Sub-steps | 3 | Physics iterations per step |
 | Time Scale | 1.0 | Simulation speed multiplier |
@@ -161,12 +188,12 @@ Volumetric soft body dropped on ground, showing pressure-based volume preservati
 | Steel | 0.6 | 0.6 | 0.4 |
 | Ice | 0.3 | 0.1 | 0.03 |
 
-## ?? Physics Models
+## 📐 Physics Models
 
 ### Rigid Body Restitution
-Post-impact normal velocity: `v_post = -e � v_pre`
+Post-impact normal velocity: `v_post = -e · v_pre`
 
-Energy retained per bounce: `E_n / E_0 ? e�`
+Energy retained per bounce: `E_n / E_0 ≈ e²`
 
 ### Soft Body Constraints
 - **Structural**: Maintains edge lengths
@@ -174,14 +201,14 @@ Energy retained per bounce: `E_n / E_0 ? e�`
 - **Bending**: Resists folding
 - **Volume**: Preserves internal pressure (volumetric bodies)
 
-## ?? Performance Targets
+## 🎯 Performance Targets
 
 - **60 FPS** @ 1080p on mid-tier hardware
 - ~200 dynamic rigid bodies
 - ~2500 soft body vertices (single cloth)
 - Batched interop for minimal per-frame overhead
 
-## ?? Troubleshooting
+## 🛠️ Troubleshooting
 
 ### WebGL Not Available
 Ensure your browser supports WebGL2. Check at [get.webgl.org](https://get.webgl.org/).
@@ -195,7 +222,7 @@ Ammo.js WASM may fail to load on some systems. The app will fall back to rigid-o
 - Lower soft body resolution
 - Reduce substep count
 
-## ?? Documentation
+## 📚 Documentation
 
 - [Architecture Overview](docs/architecture.md)
 - [Rigid Body Physics](docs/physics.md)
@@ -204,7 +231,7 @@ Ammo.js WASM may fail to load on some systems. The app will fall back to rigid-o
 - [Performance Tuning](docs/perf-tuning.md)
 - [Roadmap](docs/roadmap.md)
 
-## ? Verification Checklist
+## ✅ Verification Checklist
 
 ### Rigid Body Tests
 - [ ] Sphere with e=0.8 shows geometrically decaying bounces
@@ -223,11 +250,11 @@ Ammo.js WASM may fail to load on some systems. The app will fall back to rigid-o
 - [ ] Responsive UI during simulation
 - [ ] No visible memory leaks over time
 
-## ?? License
+## 📄 License
 
 MIT License - See LICENSE file for details.
 
-## ?? Acknowledgments
+## 🙏 Acknowledgments
 
 - [Babylon.js](https://www.babylonjs.com/) - 3D rendering engine
 - [Rapier](https://rapier.rs/) - Rust/WASM rigid body physics

@@ -1,4 +1,5 @@
-using BlazorClient.Models;
+using BlazorClient.Domain.Models;
+using BlazorClient.Domain.Common;
 using Microsoft.JSInterop;
 using System.Text.Json;
 

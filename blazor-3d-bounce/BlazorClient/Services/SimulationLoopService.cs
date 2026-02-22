@@ -1,5 +1,5 @@
-using BlazorClient.Models;
-using BlazorClient.Services.Events;
+using BlazorClient.Domain.Models;
+using BlazorClient.Application.Events;
 
 namespace BlazorClient.Services;
 

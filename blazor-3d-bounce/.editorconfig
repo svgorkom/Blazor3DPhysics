@@ -1,0 +1,66 @@
+# EditorConfig helps maintain consistent coding styles
+# https://editorconfig.org
+
+root = true
+
+# All files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Markdown files - ensure UTF-8 for emoji support
+[*.md]
+charset = utf-8
+trim_trailing_whitespace = false
+max_line_length = off
+
+# JSON files
+[*.json]
+indent_size = 2
+
+# YAML files
+[*.{yml,yaml}]
+indent_size = 2
+
+# C# files
+[*.cs]
+charset = utf-8-bom
+indent_style = space
+indent_size = 4
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_namespace_declarations = file_scoped:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+
+# Razor files
+[*.{razor,cshtml}]
+charset = utf-8
+indent_size = 4
+
+# JavaScript files
+[*.js]
+charset = utf-8
+indent_size = 2
+
+# CSS files
+[*.css]
+charset = utf-8
+indent_size = 2
+
+# HTML files
+[*.html]
+charset = utf-8
+indent_size = 2
+
+# XML and config files
+[*.{xml,config,props,targets,csproj}]
+indent_size = 2

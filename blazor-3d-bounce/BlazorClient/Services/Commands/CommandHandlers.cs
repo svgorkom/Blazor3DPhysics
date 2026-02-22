@@ -1,6 +1,8 @@
-using BlazorClient.Models;
-using BlazorClient.Services.Events;
-using BlazorClient.Services.Validation;
+using BlazorClient.Domain.Models;
+using BlazorClient.Domain.Common;
+using BlazorClient.Application.Commands;
+using BlazorClient.Application.Events;
+using BlazorClient.Application.Validation;
 
 namespace BlazorClient.Services.Commands;
 

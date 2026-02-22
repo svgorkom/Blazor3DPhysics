@@ -17,44 +17,44 @@ This document details the rigid body physics implementation using Rapier.js.
 The coefficient of restitution determines how "bouncy" a collision is:
 
 ```
-e = 0    ? Perfectly inelastic (no bounce)
-e = 1    ? Perfectly elastic (full bounce)
-e = 0.8  ? Typical rubber ball
+e = 0    → Perfectly inelastic (no bounce)
+e = 1    → Perfectly elastic (full bounce)
+e = 0.8  → Typical rubber ball
 ```
 
 ### Velocity After Impact
 
 For a collision with a static surface:
 ```
-v_post_normal = -e � v_pre_normal
+v_post_normal = -e × v_pre_normal
 ```
 
 For two moving bodies:
 ```
-v_post_normal = -e � v_relative_normal
+v_post_normal = -e × v_relative_normal
 ```
 
 ### Energy Decay
 
 Energy retained after n bounces:
 ```
-E_n / E_0 ? e^(2n)
+E_n / E_0 ≈ e^(2n)
 ```
 
 Example: e=0.8, bouncing from h=5m
 | Bounce | Expected Height | Calculation |
 |--------|----------------|-------------|
 | 0 | 5.00 m | Initial |
-| 1 | 3.20 m | 5 � 0.64 |
-| 2 | 2.05 m | 5 � 0.64� |
-| 3 | 1.31 m | 5 � 0.64� |
-| 4 | 0.84 m | 5 � 0.64? |
+| 1 | 3.20 m | 5 × 0.64 |
+| 2 | 2.05 m | 5 × 0.64² |
+| 3 | 1.31 m | 5 × 0.64³ |
+| 4 | 0.84 m | 5 × 0.64⁴ |
 
 ### Combined Restitution
 
 When two bodies collide, Rapier uses geometric mean by default:
 ```
-e_combined = ?(e_a � e_b)
+e_combined = √(e_a × e_b)
 ```
 
 ## Friction Model
@@ -63,24 +63,24 @@ e_combined = ?(e_a � e_b)
 
 Rapier implements Coulomb friction with separate static and dynamic coefficients.
 
-**Static Friction (??)**
+**Static Friction (μₛ)**
 - Prevents motion from starting
-- Must overcome: `F_applied > ?? � N`
+- Must overcome: `F_applied > μₛ × N`
 
-**Dynamic Friction (??)**
+**Dynamic Friction (μₖ)**
 - Resistance during motion
-- Force: `F_friction = ?? � N`
-- Typically ?? < ??
+- Force: `F_friction = μₖ × N`
+- Typically μₖ < μₛ
 
 ### Combined Friction
 
 ```
-?_combined = ?(?_a � ?_b)
+μ_combined = √(μ_a × μ_b)
 ```
 
 ### Material Presets
 
-| Material | Static ? | Dynamic ? | Use Case |
+| Material | Static μ | Dynamic μ | Use Case |
 |----------|----------|-----------|----------|
 | Rubber | 0.9 | 0.8 | High grip |
 | Wood | 0.5 | 0.4 | Medium |
@@ -93,7 +93,7 @@ Rapier implements Coulomb friction with separate static and dynamic coefficients
 
 Reduces linear velocity over time:
 ```
-v_new = v_old � (1 - linearDamping � dt)
+v_new = v_old × (1 - linearDamping × dt)
 ```
 
 Typical values:
@@ -106,7 +106,7 @@ Typical values:
 
 Reduces rotational velocity:
 ```
-?_new = ?_old � (1 - angularDamping � dt)
+ω_new = ω_old × (1 - angularDamping × dt)
 ```
 
 ## Continuous Collision Detection (CCD)
@@ -116,8 +116,8 @@ Reduces rotational velocity:
 Fast-moving objects can pass through thin surfaces between timesteps:
 
 ```
-Frame N:   ?--------------------------|---- wall
-Frame N+1:                            |    ?
+Frame N:   ●--------------------------|---- wall
+Frame N+1:                            |    ●
                                       ^ Object passed through!
 ```
 
