@@ -1,6 +1,4 @@
-using BlazorClient.Models;
-
-namespace BlazorClient.Services;
+﻿namespace BlazorClient.Services;
 
 /// <summary>
 /// Interface for managing scene state and objects.

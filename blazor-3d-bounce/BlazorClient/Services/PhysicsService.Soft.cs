@@ -1,5 +1,4 @@
-﻿using BlazorClient.Models;
-using Microsoft.JSInterop;
+﻿using Microsoft.JSInterop;
 
 namespace BlazorClient.Services;
 

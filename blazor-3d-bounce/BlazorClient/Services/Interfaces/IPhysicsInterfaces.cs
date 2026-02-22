@@ -1,6 +1,4 @@
-﻿using BlazorClient.Models;
-
-namespace BlazorClient.Services;
+﻿namespace BlazorClient.Services;
 
 /// <summary>
 /// Base interface for all physics services.

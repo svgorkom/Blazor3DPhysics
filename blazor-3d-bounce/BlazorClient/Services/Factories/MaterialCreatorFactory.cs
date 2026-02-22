@@ -1,6 +1,4 @@
-using BlazorClient.Models;
-
-namespace BlazorClient.Services.Factories;
+﻿namespace BlazorClient.Services.Factories;
 
 /// <summary>
 /// Interface for material creation strategy.

@@ -1,6 +1,5 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using BlazorClient.Domain.Common;
-using BlazorClient.Models;
 
 namespace BlazorClient.Services;
 
@@ -295,8 +294,8 @@ public static class RateLimiterExtensions
     /// Executes an async action with rate limiting.
     /// </summary>
     public static async Task<Result<T>> ExecuteWithRateLimitAsync<T>(
-        this IRateLimiter rateLimiter, 
-        string key, 
+        this IRateLimiter rateLimiter,
+        string key,
         Func<Task<Result<T>>> action)
     {
         if (!rateLimiter.TryAcquire(key))
