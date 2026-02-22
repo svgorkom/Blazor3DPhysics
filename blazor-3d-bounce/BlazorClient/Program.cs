@@ -9,6 +9,23 @@ using BlazorClient.Application.Events;
 using BlazorClient.Application.Validation;
 using BlazorClient.Infrastructure.Events;
 using BlazorClient.Infrastructure.Validation;
+using BlazorClient.Infrastructure.Services;
+
+// Type aliases to resolve ambiguity
+using AppPerformanceMonitorOptions = BlazorClient.Application.Services.PerformanceMonitorOptions;
+using AppRateLimiterOptions = BlazorClient.Application.Services.RateLimiterOptions;
+using AppGpuPhysicsConfig = BlazorClient.Application.Services.GpuPhysicsConfig;
+using IAppPerformanceMonitor = BlazorClient.Application.Services.IPerformanceMonitor;
+using IAppRateLimiter = BlazorClient.Application.Services.IRateLimiter;
+
+// Application layer service interfaces
+using IRenderingServiceApp = BlazorClient.Application.Services.IRenderingService;
+using IRigidPhysicsServiceApp = BlazorClient.Application.Services.IRigidPhysicsService;
+using ISoftPhysicsServiceApp = BlazorClient.Application.Services.ISoftPhysicsService;
+using ISceneStateServiceApp = BlazorClient.Application.Services.ISceneStateService;
+using ISimulationLoopServiceApp = BlazorClient.Application.Services.ISimulationLoopService;
+using IInteropServiceApp = BlazorClient.Application.Services.IInteropService;
+using IGpuPhysicsServiceApp = BlazorClient.Application.Services.IGpuPhysicsService;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.RootComponents.Add<App>("#app");
@@ -18,7 +35,8 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 
 #region Core Services (DIP - depend on abstractions)
 
-builder.Services.AddScoped<IRenderingService, RenderingService>();
+// Rendering service (Babylon.js integration)
+builder.Services.AddScoped<IRenderingServiceApp, RenderingService>();
 
 // CPU physics (fallback for when GPU is unavailable)
 builder.Services.AddScoped<CpuPhysicsService>();
@@ -26,8 +44,8 @@ builder.Services.AddScoped<CpuPhysicsService>();
 // CPU-based rigid physics (original implementation)
 builder.Services.AddScoped<RigidPhysicsService>();
 
-// GPU physics configuration
-builder.Services.AddSingleton<GpuPhysicsConfig>(sp => new GpuPhysicsConfig
+// GPU physics configuration (Application layer type)
+builder.Services.AddSingleton<AppGpuPhysicsConfig>(sp => new AppGpuPhysicsConfig
 {
     MaxBodies = 16384,
     MaxContacts = 65536,
@@ -39,42 +57,46 @@ builder.Services.AddSingleton<GpuPhysicsConfig>(sp => new GpuPhysicsConfig
 });
 
 // GPU-accelerated physics with CPU fallback
-builder.Services.AddScoped<IGpuPhysicsService>(sp =>
+builder.Services.AddScoped<IGpuPhysicsServiceApp>(sp =>
 {
     var jsRuntime = sp.GetRequiredService<Microsoft.JSInterop.IJSRuntime>();
     var cpuFallback = sp.GetRequiredService<CpuPhysicsService>();
-    var config = sp.GetRequiredService<GpuPhysicsConfig>();
+    var config = sp.GetRequiredService<AppGpuPhysicsConfig>();
     return new GpuPhysicsService(jsRuntime, cpuFallback, config);
 });
 
 // Register GPU physics as the primary rigid physics service
-builder.Services.AddScoped<IRigidPhysicsService>(sp => sp.GetRequiredService<IGpuPhysicsService>());
+builder.Services.AddScoped<IRigidPhysicsServiceApp>(sp => sp.GetRequiredService<IGpuPhysicsServiceApp>());
 
-builder.Services.AddScoped<ISoftPhysicsService, SoftPhysicsService>();
-builder.Services.AddScoped<IInteropService, InteropService>();
-builder.Services.AddScoped<ISceneStateService, SceneStateService>();
+builder.Services.AddScoped<ISoftPhysicsServiceApp, SoftPhysicsService>();
+builder.Services.AddScoped<IInteropServiceApp, InteropService>();
+builder.Services.AddScoped<ISceneStateServiceApp, SceneStateService>();
 
 #endregion
 
 #region Simulation Loop (SRP - extracted from Index.razor)
 
-builder.Services.AddScoped<ISimulationLoopService, SimulationLoopService>();
+builder.Services.AddScoped<ISimulationLoopServiceApp, SimulationLoopService>();
 
 #endregion
 
 #region Factories (OCP - extensible mesh and material creation)
 
-builder.Services.AddSingleton<IMeshCreatorFactory, MeshCreatorFactory>();
-builder.Services.AddSingleton<IMaterialCreatorFactory, MaterialCreatorFactory>();
+// Use local factory interfaces from BlazorClient.Services.Factories
+builder.Services.AddSingleton<BlazorClient.Services.Factories.IMeshCreatorFactory, MeshCreatorFactory>();
+builder.Services.AddSingleton<BlazorClient.Services.Factories.IMaterialCreatorFactory, MaterialCreatorFactory>();
 
 #endregion
 
 #region Segregated Interfaces (ISP - clients depend only on needed interfaces)
 
-builder.Services.AddScoped<IClothPhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
-builder.Services.AddScoped<IVolumetricPhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
-builder.Services.AddScoped<IVertexPinningService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
-builder.Services.AddScoped<ISoftBodyVertexDataService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
+// These use Application layer interfaces, resolved from Services layer implementations
+builder.Services.AddScoped<BlazorClient.Application.Services.IClothPhysicsService>(sp => 
+    sp.GetRequiredService<ISoftPhysicsServiceApp>());
+builder.Services.AddScoped<BlazorClient.Application.Services.IVolumetricPhysicsService>(sp => 
+    sp.GetRequiredService<ISoftPhysicsServiceApp>());
+builder.Services.AddScoped<BlazorClient.Application.Services.IVertexPinningService>(sp => 
+    sp.GetRequiredService<ISoftPhysicsServiceApp>());
 
 #endregion
 
@@ -93,11 +115,11 @@ builder.Services.AddScoped<CommandDispatcher>();
 builder.Services.AddScoped<ICommandDispatcher>(sp =>
 {
     var baseDispatcher = sp.GetRequiredService<CommandDispatcher>();
-    var performanceMonitor = sp.GetRequiredService<IPerformanceMonitor>();
+    var performanceMonitor = sp.GetRequiredService<IAppPerformanceMonitor>();
     return new LoggingCommandDispatcher(baseDispatcher, performanceMonitor);
 });
 
-// Command handlers
+// Command handlers (from UI Services layer)
 builder.Services.AddScoped<ICommandHandler<SpawnRigidBodyCommand, string>, SpawnRigidBodyCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<SpawnSoftBodyCommand, string>, SpawnSoftBodyCommandHandler>();
 builder.Services.AddScoped<ICommandHandler<DeleteObjectCommand>, DeleteObjectCommandHandler>();
@@ -109,12 +131,12 @@ builder.Services.AddScoped<ICommandHandler<UpdateRenderSettingsCommand>, UpdateR
 
 #endregion
 
-#region Performance & Monitoring
+#region Performance & Monitoring (Infrastructure layer implementations)
 
-// Configure performance monitor with options
-builder.Services.AddSingleton<IPerformanceMonitor>(sp =>
+// Configure performance monitor with options (Application layer types, Infrastructure implementation)
+builder.Services.AddSingleton<IAppPerformanceMonitor>(sp =>
 {
-    var options = new PerformanceMonitorOptions
+    var options = new AppPerformanceMonitorOptions
     {
         DetailedProfilingEnabled = false, // Enable in dev if needed
         SampleCount = 60,
@@ -130,11 +152,11 @@ builder.Services.AddSingleton<IPerformanceMonitor>(sp =>
 
 #endregion
 
-#region Rate Limiting (DoS protection)
+#region Rate Limiting (DoS protection - Infrastructure layer implementation)
 
-builder.Services.AddSingleton<IRateLimiter>(sp =>
+builder.Services.AddSingleton<IAppRateLimiter>(sp =>
 {
-    var options = new RateLimiterOptions
+    var options = new AppRateLimiterOptions
     {
         MaxRequests = 100, // 100 requests per window
         Window = TimeSpan.FromMinutes(1),
@@ -160,13 +182,13 @@ builder.Services.AddSingleton<IPhysicsValidator, PhysicsValidator>();
 
 #region Serialization (Scene import/export)
 
-builder.Services.AddScoped<ISceneSerializationService, SceneSerializationService>();
+builder.Services.AddScoped<BlazorClient.Services.ISceneSerializationService, SceneSerializationService>();
 
 #endregion
 
 #region JS Interop Optimization
 
-builder.Services.AddScoped<IJsModuleCache, JsModuleCache>();
+builder.Services.AddScoped<BlazorClient.Services.IJsModuleCache, JsModuleCache>();
 
 #endregion
 

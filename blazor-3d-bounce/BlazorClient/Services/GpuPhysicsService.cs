@@ -1,55 +1,22 @@
 ﻿using Microsoft.JSInterop;
 using System.Text.Json.Serialization;
+using BlazorClient.Domain.Models;
+using BlazorClient.Application.Services;
+using AppGpuPhysicsConfig = BlazorClient.Application.Services.GpuPhysicsConfig;
+using AppGpuPhysicsMetrics = BlazorClient.Application.Services.GpuPhysicsMetrics;
 
 namespace BlazorClient.Services;
 
 /// <summary>
-/// Configuration for GPU physics engine.
+/// Performance metrics from GPU physics (JS interop compatible).
 /// </summary>
-public class GpuPhysicsConfig
-{
-    /// <summary>
-    /// Maximum number of rigid bodies supported.
-    /// </summary>
-    public int MaxBodies { get; set; } = 16384;
-
-    /// <summary>
-    /// Maximum number of contacts per frame.
-    /// </summary>
-    public int MaxContacts { get; set; } = 65536;
-
-    /// <summary>
-    /// Number of solver iterations per physics step.
-    /// Higher values improve stability but reduce performance.
-    /// </summary>
-    public int SolverIterations { get; set; } = 8;
-
-    /// <summary>
-    /// Spatial hash grid cell size.
-    /// Should be approximately 2x the largest object radius.
-    /// </summary>
-    public float GridCellSize { get; set; } = 2.0f;
-
-    /// <summary>
-    /// Enable continuous collision detection for fast-moving objects.
-    /// </summary>
-    public bool EnableCCD { get; set; } = false;
-
-    /// <summary>
-    /// Enable warm-starting for faster solver convergence.
-    /// </summary>
-    public bool EnableWarmStarting { get; set; } = true;
-
-    /// <summary>
-    /// Fall back to CPU physics if GPU is unavailable.
-    /// </summary>
-    public bool EnableCpuFallback { get; set; } = true;
-}
-
-/// <summary>
-/// Performance metrics from GPU physics.
-/// </summary>
-public class GpuPhysicsMetrics
+/// <remarks>
+/// <para>
+/// This internal type is used for JSON deserialization from JavaScript.
+/// It maps to the Application layer's <see cref="AppGpuPhysicsMetrics"/>.
+/// </para>
+/// </remarks>
+internal class JsGpuPhysicsMetrics
 {
     /// <summary>
     /// Total time for last physics step (ms).
@@ -98,28 +65,49 @@ public class GpuPhysicsMetrics
     /// </summary>
     [JsonPropertyName("isGpuActive")]
     public bool IsGpuActive { get; set; }
+
+    /// <summary>
+    /// Converts to Application layer metrics type.
+    /// </summary>
+    public AppGpuPhysicsMetrics ToAppMetrics() => new()
+    {
+        TotalStepTimeMs = TotalStepTimeMs,
+        BroadphaseTimeMs = BroadPhaseTimeMs,
+        NarrowphaseTimeMs = NarrowPhaseTimeMs,
+        SolverTimeMs = SolverTimeMs,
+        ContactCount = ContactCount,
+        BodyCount = BodyCount,
+        IsGpuActive = IsGpuActive
+    };
 }
 
 /// <summary>
-/// Interface for GPU-accelerated rigid body physics.
-/// Extends IRigidPhysicsService with GPU-specific capabilities.
+/// Extended GPU physics service interface with UI-specific properties.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Extends the Application layer's <see cref="Application.Services.IGpuPhysicsService"/>
+/// with additional properties needed by the UI layer.
+/// </para>
+/// </remarks>
 public interface IGpuPhysicsService : IRigidPhysicsService
 {
     /// <summary>
     /// Checks if WebGPU compute is available.
     /// </summary>
+    /// <returns>True if GPU physics is available and active.</returns>
     Task<bool> IsGpuAvailableAsync();
 
     /// <summary>
     /// Gets current GPU physics metrics.
     /// </summary>
-    Task<GpuPhysicsMetrics> GetMetricsAsync();
+    /// <returns>Performance metrics from the GPU physics engine.</returns>
+    Task<AppGpuPhysicsMetrics> GetMetricsAsync();
 
     /// <summary>
     /// Gets the configuration.
     /// </summary>
-    GpuPhysicsConfig Config { get; }
+    AppGpuPhysicsConfig Config { get; }
 
     /// <summary>
     /// Whether GPU physics is currently active.
@@ -129,29 +117,51 @@ public interface IGpuPhysicsService : IRigidPhysicsService
 
 /// <summary>
 /// GPU-accelerated physics service using WebGPU compute shaders.
-/// Falls back to CPU physics when GPU is unavailable.
 /// </summary>
-public class GpuPhysicsService : IGpuPhysicsService, IAsyncDisposable
+/// <remarks>
+/// <para>
+/// Implements GPU-accelerated rigid body physics with automatic CPU fallback
+/// when WebGPU is unavailable.
+/// </para>
+/// <para>
+/// <strong>Architecture Layer:</strong> Presentation/Services Layer (UI-specific implementation).
+/// </para>
+/// <para>
+/// <strong>Fallback Strategy:</strong> When GPU initialization fails and
+/// <see cref="AppGpuPhysicsConfig.EnableCpuFallback"/> is true, automatically
+/// delegates to <see cref="CpuPhysicsService"/>.
+/// </para>
+/// </remarks>
+public class GpuPhysicsService : BlazorClient.Application.Services.IGpuPhysicsService, IAsyncDisposable
 {
     private readonly IJSRuntime _jsRuntime;
-    private readonly IRigidPhysicsService _cpuFallback;
-    private readonly GpuPhysicsConfig _config;
+    private readonly CpuPhysicsService _cpuFallback;
+    private readonly AppGpuPhysicsConfig _config;
 
     private bool _initialized;
     private bool _gpuAvailable;
     private bool _useGpu;
 
-    public GpuPhysicsConfig Config => _config;
+    /// <inheritdoc />
+    public AppGpuPhysicsConfig Config => _config;
+
+    /// <inheritdoc />
     public bool IsGpuActive => _useGpu;
 
+    /// <summary>
+    /// Initializes a new GPU physics service.
+    /// </summary>
+    /// <param name="jsRuntime">The JS runtime for interop.</param>
+    /// <param name="cpuFallback">The CPU physics service for fallback.</param>
+    /// <param name="config">Optional GPU physics configuration.</param>
     public GpuPhysicsService(
         IJSRuntime jsRuntime,
-        IRigidPhysicsService cpuFallback,
-        GpuPhysicsConfig? config = null)
+        CpuPhysicsService cpuFallback,
+        AppGpuPhysicsConfig? config = null)
     {
         _jsRuntime = jsRuntime;
         _cpuFallback = cpuFallback;
-        _config = config ?? new GpuPhysicsConfig();
+        _config = config ?? new AppGpuPhysicsConfig();
     }
 
     /// <inheritdoc />
@@ -312,6 +322,21 @@ public class GpuPhysicsService : IGpuPhysicsService, IAsyncDisposable
     }
 
     /// <inheritdoc />
+    public async Task CreateGroundAsync(float restitution = 0.3f, float friction = 0.5f)
+    {
+        if (!_initialized) return;
+
+        if (_useGpu)
+        {
+            await _jsRuntime.InvokeVoidAsync("GPUPhysicsModule.createGround", restitution, friction);
+        }
+        else
+        {
+            await _cpuFallback.CreateGroundAsync(restitution, friction);
+        }
+    }
+
+    /// <inheritdoc />
     public async Task ApplyImpulseAsync(string id, Vector3 impulse)
     {
         if (!_initialized) return;
@@ -323,41 +348,6 @@ public class GpuPhysicsService : IGpuPhysicsService, IAsyncDisposable
         else
         {
             await _cpuFallback.ApplyImpulseAsync(id, impulse);
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task ApplyForceAsync(string id, Vector3 force)
-    {
-        if (!_initialized) return;
-
-        if (_useGpu)
-        {
-            // Convert force to impulse (F * dt)
-            var impulse = new Vector3(
-                force.X * 0.016f,
-                force.Y * 0.016f,
-                force.Z * 0.016f);
-            await ApplyImpulseAsync(id, impulse);
-        }
-        else
-        {
-            await _cpuFallback.ApplyForceAsync(id, force);
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task SetLinearVelocityAsync(string id, Vector3 velocity)
-    {
-        if (!_initialized) return;
-
-        if (_useGpu)
-        {
-            await _jsRuntime.InvokeVoidAsync("GPUPhysicsModule.setLinearVelocity", id, velocity.ToArray());
-        }
-        else
-        {
-            await _cpuFallback.SetLinearVelocityAsync(id, velocity);
         }
     }
 
@@ -399,17 +389,35 @@ public class GpuPhysicsService : IGpuPhysicsService, IAsyncDisposable
     }
 
     /// <inheritdoc />
-    public async Task<RigidTransformBatch> GetTransformBatchAsync()
+    public async Task<Dictionary<string, TransformData>> GetTransformBatchAsync()
     {
-        if (!_initialized) return new RigidTransformBatch();
+        if (!_initialized) return new Dictionary<string, TransformData>();
 
         if (_useGpu)
         {
-            return await _jsRuntime.InvokeAsync<RigidTransformBatch>("GPUPhysicsModule.getTransformBatch");
+            // Get from GPU and convert to Dictionary
+            var batch = await _jsRuntime.InvokeAsync<RigidTransformBatch>("GPUPhysicsModule.getTransformBatch");
+            return ConvertBatchToDictionary(batch);
         }
         else
         {
             return await _cpuFallback.GetTransformBatchAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateTransformAsync(string id, TransformData transform)
+    {
+        if (!_initialized) return;
+
+        if (_useGpu)
+        {
+            await _jsRuntime.InvokeVoidAsync("GPUPhysicsModule.updateTransform", id, 
+                transform.Position.ToArray(), transform.Rotation.ToArray());
+        }
+        else
+        {
+            await _cpuFallback.UpdateTransformAsync(id, transform);
         }
     }
 
@@ -429,41 +437,23 @@ public class GpuPhysicsService : IGpuPhysicsService, IAsyncDisposable
     }
 
     /// <inheritdoc />
-    public async Task CreateGroundAsync(float restitution = 0.3f, float friction = 0.5f)
-    {
-        if (!_initialized) return;
-
-        // GPU physics handles ground collision in the shader
-        // CPU fallback needs explicit ground creation
-        if (!_useGpu)
-        {
-            await _cpuFallback.CreateGroundAsync(restitution, friction);
-        }
-    }
-
-    /// <inheritdoc />
-    public async Task<GpuPhysicsMetrics> GetMetricsAsync()
+    public async Task<AppGpuPhysicsMetrics> GetMetricsAsync()
     {
         if (!_initialized || !_useGpu)
         {
-            return new GpuPhysicsMetrics
-            {
-                IsGpuActive = false
-            };
+            return new AppGpuPhysicsMetrics { IsGpuActive = false };
         }
 
         try
         {
-            var metrics = await _jsRuntime.InvokeAsync<GpuPhysicsMetrics>("GPUPhysicsModule.getMetrics");
+            var jsMetrics = await _jsRuntime.InvokeAsync<JsGpuPhysicsMetrics>("GPUPhysicsModule.getMetrics");
+            var metrics = jsMetrics.ToAppMetrics();
             metrics.IsGpuActive = true;
             return metrics;
         }
         catch
         {
-            return new GpuPhysicsMetrics
-            {
-                IsGpuActive = false
-            };
+            return new AppGpuPhysicsMetrics { IsGpuActive = false };
         }
     }
 
@@ -481,5 +471,21 @@ public class GpuPhysicsService : IGpuPhysicsService, IAsyncDisposable
                 await disposable.DisposeAsync();
             }
         }
+    }
+
+    private static Dictionary<string, TransformData> ConvertBatchToDictionary(RigidTransformBatch batch)
+    {
+        var result = new Dictionary<string, TransformData>();
+        for (int i = 0; i < batch.Ids.Length; i++)
+        {
+            var offset = i * 7;
+            result[batch.Ids[i]] = new TransformData
+            {
+                Position = new Vector3(batch.Transforms[offset], batch.Transforms[offset + 1], batch.Transforms[offset + 2]),
+                Rotation = new Quaternion(batch.Transforms[offset + 3], batch.Transforms[offset + 4], batch.Transforms[offset + 5], batch.Transforms[offset + 6]),
+                Scale = Vector3.One
+            };
+        }
+        return result;
     }
 }

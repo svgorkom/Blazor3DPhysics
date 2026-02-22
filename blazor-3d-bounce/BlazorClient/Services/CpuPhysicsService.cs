@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using BlazorClient.Domain.Models;
+using BlazorClient.Application.Services;
 using SysVector3 = System.Numerics.Vector3;
 using SysQuaternion = System.Numerics.Quaternion;
 using DomainVector3 = BlazorClient.Domain.Models.Vector3;
@@ -13,7 +14,23 @@ namespace BlazorClient.Services;
 /// CPU-based physics service with SIMD optimization.
 /// Used as fallback when GPU physics is unavailable.
 /// </summary>
-public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
+/// <remarks>
+/// <para>
+/// Implements a complete rigid body physics simulation including:
+/// - Semi-implicit Euler integration
+/// - AABB and sphere collision detection
+/// - Impulse-based collision response with friction
+/// - Baumgarte position correction
+/// </para>
+/// <para>
+/// <strong>Architecture Layer:</strong> Presentation/Services Layer.
+/// </para>
+/// <para>
+/// <strong>Performance:</strong> Uses SIMD via System.Numerics and
+/// parallel processing for multi-body simulation.
+/// </para>
+/// </remarks>
+public class CpuPhysicsService : BlazorClient.Application.Services.IRigidPhysicsService
 {
     // Physics state
     private readonly ConcurrentDictionary<string, CpuRigidBody> _bodies = new();
@@ -97,7 +114,9 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Updates rigid body properties.
+    /// </summary>
     public Task UpdateRigidBodyAsync(RigidBody body)
     {
         if (_bodies.TryGetValue(body.Id, out var cpuBody))
@@ -122,7 +141,9 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Applies a continuous force to a rigid body.
+    /// </summary>
     public Task ApplyForceAsync(string id, DomainVector3 force)
     {
         var impulse = new DomainVector3(
@@ -132,7 +153,9 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         return ApplyImpulseAsync(id, impulse);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Sets the linear velocity of a rigid body.
+    /// </summary>
     public Task SetLinearVelocityAsync(string id, DomainVector3 velocity)
     {
         if (_bodies.TryGetValue(id, out var body) && !body.IsStatic)
@@ -167,16 +190,9 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
 
         for (int step = 0; step < numSubSteps; step++)
         {
-            // 1. Integration
             IntegrateBodies(bodies, subDt);
-
-            // 2. Collision Detection
             DetectCollisions(bodies);
-
-            // 3. Collision Resolution
             SolveCollisions(bodies, subDt);
-
-            // 4. Position Correction
             CorrectPositions();
         }
 
@@ -185,7 +201,27 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
     }
 
     /// <inheritdoc />
-    public Task<RigidTransformBatch> GetTransformBatchAsync()
+    public Task<Dictionary<string, TransformData>> GetTransformBatchAsync()
+    {
+        var result = new Dictionary<string, TransformData>();
+        
+        foreach (var body in _bodies.Values)
+        {
+            result[body.Id] = new TransformData
+            {
+                Position = new DomainVector3(body.Position.X, body.Position.Y, body.Position.Z),
+                Rotation = new DomainQuaternion(body.Rotation.X, body.Rotation.Y, body.Rotation.Z, body.Rotation.W),
+                Scale = new DomainVector3(body.Scale.X, body.Scale.Y, body.Scale.Z)
+            };
+        }
+
+        return Task.FromResult(result);
+    }
+
+    /// <summary>
+    /// Gets transforms for all rigid bodies as a batched result (alternative format).
+    /// </summary>
+    public Task<RigidTransformBatch> GetTransformBatchArrayAsync()
     {
         var bodies = _bodies.Values.ToArray();
         var transforms = new float[bodies.Length * 7];
@@ -215,6 +251,18 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
     }
 
     /// <inheritdoc />
+    public Task UpdateTransformAsync(string id, TransformData transform)
+    {
+        if (_bodies.TryGetValue(id, out var body))
+        {
+            body.Position = ToSysVector3(transform.Position);
+            body.Rotation = ToSysQuaternion(transform.Rotation);
+            body.Scale = ToSysVector3(transform.Scale);
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public Task ResetAsync()
     {
         foreach (var kvp in _initialStates)
@@ -231,7 +279,9 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Creates a ground plane for physics collision.
+    /// </summary>
     public Task CreateGroundAsync(float restitution = 0.3f, float friction = 0.5f)
     {
         _groundRestitution = restitution;
@@ -254,26 +304,20 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
 
     private void IntegrateBodies(CpuRigidBody[] bodies, float dt)
     {
-        // Use Parallel.For for SIMD optimization on multiple bodies
         Parallel.For(0, bodies.Length, i =>
         {
             var body = bodies[i];
             if (body.IsStatic) return;
 
-            // Semi-implicit Euler
-            // Update velocity first
             body.LinearVelocity += _gravity * dt;
 
-            // Apply damping
             var linearDamp = MathF.Exp(-body.LinearDamping * dt);
             var angularDamp = MathF.Exp(-body.AngularDamping * dt);
             body.LinearVelocity *= linearDamp;
             body.AngularVelocity *= angularDamp;
 
-            // Update position with new velocity
             body.Position += body.LinearVelocity * dt;
 
-            // Update rotation
             if (body.AngularVelocity.LengthSquared() > EPSILON)
             {
                 var omega = body.AngularVelocity;
@@ -295,20 +339,15 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         {
             _contacts.Clear();
 
-            // Ground collisions
             for (int i = 0; i < bodies.Length; i++)
             {
                 var body = bodies[i];
                 if (body.IsStatic) continue;
 
                 var contact = TestGroundCollision(body);
-                if (contact != null)
-                {
-                    _contacts.Add(contact);
-                }
+                if (contact != null) _contacts.Add(contact);
             }
 
-            // Body-body collisions (O(n²) - acceptable for CPU fallback)
             for (int i = 0; i < bodies.Length; i++)
             {
                 for (int j = i + 1; j < bodies.Length; j++)
@@ -316,14 +355,10 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
                     var a = bodies[i];
                     var b = bodies[j];
 
-                    // Skip static-static
                     if (a.IsStatic && b.IsStatic) continue;
 
                     var contact = TestCollision(a, b);
-                    if (contact != null)
-                    {
-                        _contacts.Add(contact);
-                    }
+                    if (contact != null) _contacts.Add(contact);
                 }
             }
         }
@@ -331,22 +366,16 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
 
     private Contact? TestGroundCollision(CpuRigidBody body)
     {
-        float bottomY;
-        if (body.ColliderType == ColliderType.Sphere)
-        {
-            bottomY = body.Position.Y - body.ColliderRadius;
-        }
-        else
-        {
-            bottomY = body.Position.Y - body.ColliderHalfExtents.Y;
-        }
+        float bottomY = body.ColliderType == ColliderType.Sphere
+            ? body.Position.Y - body.ColliderRadius
+            : body.Position.Y - body.ColliderHalfExtents.Y;
 
         if (bottomY < _groundY)
         {
             return new Contact
             {
                 BodyA = body,
-                BodyB = null,  // Ground
+                BodyB = null,
                 Normal = SysVector3.UnitY,
                 Penetration = _groundY - bottomY,
                 ContactPoint = new SysVector3(body.Position.X, _groundY, body.Position.Z),
@@ -354,25 +383,18 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
                 Friction = MathF.Sqrt(body.DynamicFriction * _groundFriction)
             };
         }
-
         return null;
     }
 
     private Contact? TestCollision(CpuRigidBody a, CpuRigidBody b)
     {
         if (a.ColliderType == ColliderType.Sphere && b.ColliderType == ColliderType.Sphere)
-        {
             return TestSphereSphere(a, b);
-        }
-        else if (a.ColliderType == ColliderType.AABB && b.ColliderType == ColliderType.AABB)
-        {
+        if (a.ColliderType == ColliderType.AABB && b.ColliderType == ColliderType.AABB)
             return TestAABBAABB(a, b);
-        }
-        else if (a.ColliderType == ColliderType.Sphere && b.ColliderType == ColliderType.AABB)
-        {
+        if (a.ColliderType == ColliderType.Sphere && b.ColliderType == ColliderType.AABB)
             return TestSphereAABB(a, b);
-        }
-        else if (a.ColliderType == ColliderType.AABB && b.ColliderType == ColliderType.Sphere)
+        if (a.ColliderType == ColliderType.AABB && b.ColliderType == ColliderType.Sphere)
         {
             var contact = TestSphereAABB(b, a);
             if (contact != null)
@@ -382,7 +404,6 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
             }
             return contact;
         }
-
         return null;
     }
 
@@ -392,8 +413,7 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         var distSq = d.LengthSquared();
         var radiusSum = a.ColliderRadius + b.ColliderRadius;
 
-        if (distSq >= radiusSum * radiusSum)
-            return null;
+        if (distSq >= radiusSum * radiusSum) return null;
 
         var dist = MathF.Sqrt(distSq);
         SysVector3 normal;
@@ -415,11 +435,8 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
 
         return new Contact
         {
-            BodyA = a,
-            BodyB = b,
-            Normal = normal,
-            Penetration = penetration,
-            ContactPoint = contactPoint,
+            BodyA = a, BodyB = b,
+            Normal = normal, Penetration = penetration, ContactPoint = contactPoint,
             Restitution = MathF.Min(a.Restitution, b.Restitution),
             Friction = MathF.Sqrt(a.DynamicFriction * b.DynamicFriction)
         };
@@ -432,12 +449,10 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         var minB = b.Position - b.ColliderHalfExtents;
         var maxB = b.Position + b.ColliderHalfExtents;
 
-        // Separating axis test
         if (maxA.X < minB.X || maxB.X < minA.X) return null;
         if (maxA.Y < minB.Y || maxB.Y < minA.Y) return null;
         if (maxA.Z < minB.Z || maxB.Z < minA.Z) return null;
 
-        // Find minimum penetration axis
         var penX = MathF.Min(maxA.X - minB.X, maxB.X - minA.X);
         var penY = MathF.Min(maxA.Y - minB.Y, maxB.Y - minA.Y);
         var penZ = MathF.Min(maxA.Z - minB.Z, maxB.Z - minA.Z);
@@ -461,15 +476,11 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
             normal = (a.Position.Z < b.Position.Z) ? -SysVector3.UnitZ : SysVector3.UnitZ;
         }
 
-        var contactPoint = (SysVector3.Max(minA, minB) + SysVector3.Min(maxA, maxB)) * 0.5f;
-
         return new Contact
         {
-            BodyA = a,
-            BodyB = b,
-            Normal = normal,
-            Penetration = penetration,
-            ContactPoint = contactPoint,
+            BodyA = a, BodyB = b,
+            Normal = normal, Penetration = penetration,
+            ContactPoint = (SysVector3.Max(minA, minB) + SysVector3.Min(maxA, maxB)) * 0.5f,
             Restitution = MathF.Min(a.Restitution, b.Restitution),
             Friction = MathF.Sqrt(a.DynamicFriction * b.DynamicFriction)
         };
@@ -477,24 +488,18 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
 
     private Contact? TestSphereAABB(CpuRigidBody sphere, CpuRigidBody box)
     {
-        var closest = SysVector3.Clamp(
-            sphere.Position,
-            box.Position - box.ColliderHalfExtents,
-            box.Position + box.ColliderHalfExtents);
-
+        var closest = SysVector3.Clamp(sphere.Position, box.Position - box.ColliderHalfExtents, box.Position + box.ColliderHalfExtents);
         var diff = sphere.Position - closest;
         var distSq = diff.LengthSquared();
 
-        if (distSq >= sphere.ColliderRadius * sphere.ColliderRadius)
-            return null;
+        if (distSq >= sphere.ColliderRadius * sphere.ColliderRadius) return null;
 
         SysVector3 normal;
         float penetration;
-
         var dist = MathF.Sqrt(distSq);
+
         if (dist < EPSILON)
         {
-            // Sphere center inside box
             var distToFaces = box.ColliderHalfExtents - SysVector3.Abs(sphere.Position - box.Position);
             if (distToFaces.X < distToFaces.Y && distToFaces.X < distToFaces.Z)
             {
@@ -520,10 +525,8 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
 
         return new Contact
         {
-            BodyA = sphere,
-            BodyB = box,
-            Normal = normal,
-            Penetration = penetration,
+            BodyA = sphere, BodyB = box,
+            Normal = normal, Penetration = penetration,
             ContactPoint = sphere.Position - normal * sphere.ColliderRadius,
             Restitution = MathF.Min(sphere.Restitution, box.Restitution),
             Friction = MathF.Sqrt(sphere.DynamicFriction * box.DynamicFriction)
@@ -540,10 +543,7 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         {
             for (int iter = 0; iter < _solverIterations; iter++)
             {
-                foreach (var contact in _contacts)
-                {
-                    SolveContact(contact, dt);
-                }
+                foreach (var contact in _contacts) SolveContact(contact, dt);
             }
         }
     }
@@ -562,31 +562,23 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         var rA = contact.ContactPoint - a.Position;
         var rB = b != null ? contact.ContactPoint - b.Position : SysVector3.Zero;
 
-        // Relative velocity at contact
         var vA = a.LinearVelocity + SysVector3.Cross(a.AngularVelocity, rA);
         var vB = b != null ? b.LinearVelocity + SysVector3.Cross(b.AngularVelocity, rB) : SysVector3.Zero;
         var vRel = vA - vB;
 
         var vn = SysVector3.Dot(vRel, contact.Normal);
-
-        // Only resolve if approaching
         if (vn >= 0) return;
 
-        // Effective mass
         var rAxN = SysVector3.Cross(rA, contact.Normal);
         var rBxN = b != null ? SysVector3.Cross(rB, contact.Normal) : SysVector3.Zero;
-
         var angularTermA = SysVector3.Dot(rAxN, a.InverseInertia * rAxN);
         var angularTermB = b != null ? SysVector3.Dot(rBxN, b.InverseInertia * rBxN) : 0;
         var effectiveMass = 1f / (invMassSum + angularTermA + angularTermB);
 
-        // Bias for penetration
         var bias = MathF.Max(0, contact.Penetration - SLOP) * BAUMGARTE_BIAS / dt;
-
-        // Normal impulse
         var j = -(1 + contact.Restitution) * vn * effectiveMass;
         j += bias * effectiveMass;
-        j = MathF.Max(0, j);  // Can only push apart
+        j = MathF.Max(0, j);
 
         var impulse = j * contact.Normal;
 
@@ -599,17 +591,15 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
             b.AngularVelocity -= b.InverseInertia * SysVector3.Cross(rB, impulse);
         }
 
-        // Friction impulse
+        // Friction
         var vRelUpdated = (a.LinearVelocity + SysVector3.Cross(a.AngularVelocity, rA)) -
                           (b != null ? b.LinearVelocity + SysVector3.Cross(b.AngularVelocity, rB) : SysVector3.Zero);
-
         var vt = vRelUpdated - SysVector3.Dot(vRelUpdated, contact.Normal) * contact.Normal;
         var vtMag = vt.Length();
 
         if (vtMag > EPSILON)
         {
             var tangent = vt / vtMag;
-
             var rAxT = SysVector3.Cross(rA, tangent);
             var rBxT = b != null ? SysVector3.Cross(rB, tangent) : SysVector3.Zero;
             var angTermTA = SysVector3.Dot(rAxT, a.InverseInertia * rAxT);
@@ -617,8 +607,6 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
             var effectiveMassT = 1f / (invMassSum + angTermTA + angTermTB);
 
             var jt = -vtMag * effectiveMassT;
-
-            // Coulomb friction clamp
             var maxFriction = contact.Friction * j;
             jt = Math.Clamp(jt, -maxFriction, maxFriction);
 
@@ -649,16 +637,11 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
                 var invMassSum = a.InverseMass + (b?.InverseMass ?? 0);
                 if (invMassSum < EPSILON) continue;
 
-                var correction = (contact.Penetration - SLOP) * BAUMGARTE_BIAS;
-                correction = MathF.Min(correction, MAX_CORRECTION);
-
+                var correction = MathF.Min((contact.Penetration - SLOP) * BAUMGARTE_BIAS, MAX_CORRECTION);
                 var correctionVec = contact.Normal * (correction / invMassSum);
 
                 a.Position += correctionVec * a.InverseMass;
-                if (b != null)
-                {
-                    b.Position -= correctionVec * b.InverseMass;
-                }
+                if (b != null) b.Position -= correctionVec * b.InverseMass;
             }
         }
     }
@@ -683,38 +666,28 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
                 var r = scale.X * 0.5f;
                 var I = 0.4f * mass * r * r;
                 return new SysVector3(1f / I, 1f / I, 1f / I);
-
             case RigidPrimitiveType.Box:
                 var Ix = (mass / 12f) * (scale.Y * scale.Y + scale.Z * scale.Z);
                 var Iy = (mass / 12f) * (scale.X * scale.X + scale.Z * scale.Z);
                 var Iz = (mass / 12f) * (scale.X * scale.X + scale.Y * scale.Y);
                 return new SysVector3(1f / Ix, 1f / Iy, 1f / Iz);
-
             default:
                 return new SysVector3(1f / mass, 1f / mass, 1f / mass);
         }
     }
 
-    private static ColliderType GetColliderType(RigidPrimitiveType type)
+    private static ColliderType GetColliderType(RigidPrimitiveType type) => type switch
     {
-        return type switch
-        {
-            RigidPrimitiveType.Sphere => ColliderType.Sphere,
-            RigidPrimitiveType.Box => ColliderType.AABB,
-            _ => ColliderType.Sphere
-        };
-    }
+        RigidPrimitiveType.Sphere => ColliderType.Sphere,
+        RigidPrimitiveType.Box => ColliderType.AABB,
+        _ => ColliderType.Sphere
+    };
 
     // ========================================
     // Internal Types
     // ========================================
 
-    private enum ColliderType
-    {
-        Sphere,
-        AABB,
-        Capsule
-    }
+    private enum ColliderType { Sphere, AABB, Capsule }
 
     private class CpuRigidBody
     {
@@ -736,29 +709,15 @@ public class CpuPhysicsService : IRigidPhysicsService, IAsyncDisposable
         public float ColliderRadius { get; set; }
         public SysVector3 ColliderHalfExtents { get; set; }
 
-        public CpuRigidBody Clone()
+        public CpuRigidBody Clone() => new()
         {
-            return new CpuRigidBody
-            {
-                Id = Id,
-                Position = Position,
-                Rotation = Rotation,
-                Scale = Scale,
-                LinearVelocity = SysVector3.Zero,
-                AngularVelocity = SysVector3.Zero,
-                InverseMass = InverseMass,
-                InverseInertia = InverseInertia,
-                Restitution = Restitution,
-                StaticFriction = StaticFriction,
-                DynamicFriction = DynamicFriction,
-                LinearDamping = LinearDamping,
-                AngularDamping = AngularDamping,
-                IsStatic = IsStatic,
-                ColliderType = ColliderType,
-                ColliderRadius = ColliderRadius,
-                ColliderHalfExtents = ColliderHalfExtents
-            };
-        }
+            Id = Id, Position = Position, Rotation = Rotation, Scale = Scale,
+            LinearVelocity = SysVector3.Zero, AngularVelocity = SysVector3.Zero,
+            InverseMass = InverseMass, InverseInertia = InverseInertia,
+            Restitution = Restitution, StaticFriction = StaticFriction, DynamicFriction = DynamicFriction,
+            LinearDamping = LinearDamping, AngularDamping = AngularDamping, IsStatic = IsStatic,
+            ColliderType = ColliderType, ColliderRadius = ColliderRadius, ColliderHalfExtents = ColliderHalfExtents
+        };
     }
 
     private class Contact

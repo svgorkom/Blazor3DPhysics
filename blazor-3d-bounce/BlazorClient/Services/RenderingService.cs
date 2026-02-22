@@ -4,95 +4,9 @@ using Microsoft.JSInterop;
 namespace BlazorClient.Services;
 
 /// <summary>
-/// Interface for the Babylon.js rendering service.
-/// </summary>
-public interface IRenderingService
-{
-    /// <summary>
-    /// Initializes the rendering engine with the specified canvas.
-    /// </summary>
-    Task InitializeAsync(string canvasId, RenderSettings settings);
-
-    /// <summary>
-    /// Creates a visual mesh for a rigid body.
-    /// </summary>
-    Task CreateRigidMeshAsync(RigidBody body);
-
-    /// <summary>
-    /// Creates a visual mesh for a soft body.
-    /// </summary>
-    Task CreateSoftMeshAsync(SoftBody body);
-
-    /// <summary>
-    /// Updates the transform of a mesh.
-    /// </summary>
-    Task UpdateMeshTransformAsync(string id, TransformData transform);
-
-    /// <summary>
-    /// Updates the vertices of a soft body mesh.
-    /// </summary>
-    Task UpdateSoftMeshVerticesAsync(string id, float[] vertices, float[]? normals = null);
-
-    /// <summary>
-    /// Removes a mesh from the scene.
-    /// </summary>
-    Task RemoveMeshAsync(string id);
-
-    /// <summary>
-    /// Loads a GLTF/GLB model.
-    /// </summary>
-    Task<string> LoadModelAsync(string path);
-
-    /// <summary>
-    /// Sets the selected object highlight.
-    /// </summary>
-    Task SetSelectionAsync(string? id);
-
-    /// <summary>
-    /// Updates render settings.
-    /// </summary>
-    Task UpdateRenderSettingsAsync(RenderSettings settings);
-
-    /// <summary>
-    /// Resizes the rendering viewport.
-    /// </summary>
-    Task ResizeAsync();
-    
-    /// <summary>
-    /// Gets information about the active rendering backend.
-    /// </summary>
-    Task<RendererInfo> GetRendererInfoAsync();
-    
-    /// <summary>
-    /// Gets the currently active rendering backend name.
-    /// </summary>
-    Task<string> GetActiveBackendAsync();
-    
-    /// <summary>
-    /// Detects available rendering backends.
-    /// </summary>
-    Task<RendererCapabilities> DetectBackendsAsync();
-    
-    /// <summary>
-    /// Gets performance metrics from the renderer.
-    /// </summary>
-    Task<RendererPerformanceMetrics> GetPerformanceMetricsAsync();
-    
-    /// <summary>
-    /// Runs a performance benchmark comparing available backends.
-    /// </summary>
-    Task<BenchmarkResults> RunBenchmarkAsync(string canvasId);
-
-    /// <summary>
-    /// Disposes the rendering resources.
-    /// </summary>
-    ValueTask DisposeAsync();
-}
-
-/// <summary>
 /// Implementation of the Babylon.js rendering service.
 /// </summary>
-public class RenderingService : IRenderingService, IAsyncDisposable
+public class RenderingService : IRenderingService
 {
     private readonly IJSRuntime _jsRuntime;
     private bool _initialized;
@@ -202,7 +116,9 @@ public class RenderingService : IRenderingService, IAsyncDisposable
         await _jsRuntime.InvokeVoidAsync("RenderingModule.removeMesh", id);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Loads a GLTF/GLB model.
+    /// </summary>
     public async Task<string> LoadModelAsync(string path)
     {
         if (!_initialized) return string.Empty;
@@ -226,7 +142,9 @@ public class RenderingService : IRenderingService, IAsyncDisposable
         await _jsRuntime.InvokeVoidAsync("RenderingModule.updateSettings", settings);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Resizes the rendering viewport.
+    /// </summary>
     public async Task ResizeAsync()
     {
         if (!_initialized) return;
@@ -253,6 +171,23 @@ public class RenderingService : IRenderingService, IAsyncDisposable
     }
 
     /// <inheritdoc />
+    public async Task<float> GetFpsAsync()
+    {
+        if (!_initialized) return 0f;
+
+        try
+        {
+            return await _jsRuntime.InvokeAsync<float>("RenderingModule.getFps");
+        }
+        catch
+        {
+            return 0f;
+        }
+    }
+
+    /// <summary>
+    /// Gets the currently active rendering backend name.
+    /// </summary>
     public async Task<string> GetActiveBackendAsync()
     {
         if (!_initialized) return "Not Initialized";
@@ -267,7 +202,9 @@ public class RenderingService : IRenderingService, IAsyncDisposable
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Detects available rendering backends.
+    /// </summary>
     public async Task<RendererCapabilities> DetectBackendsAsync()
     {
         try
@@ -280,7 +217,9 @@ public class RenderingService : IRenderingService, IAsyncDisposable
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Gets performance metrics from the renderer.
+    /// </summary>
     public async Task<RendererPerformanceMetrics> GetPerformanceMetricsAsync()
     {
         if (!_initialized)
@@ -298,7 +237,9 @@ public class RenderingService : IRenderingService, IAsyncDisposable
         }
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Runs a performance benchmark comparing available backends.
+    /// </summary>
     public async Task<BenchmarkResults> RunBenchmarkAsync(string canvasId)
     {
         try

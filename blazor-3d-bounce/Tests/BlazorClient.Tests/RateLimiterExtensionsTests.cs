@@ -1,5 +1,6 @@
 ﻿using BlazorClient.Domain.Common;
 using BlazorClient.Services;
+using BlazorClient.Application.Services;
 using NSubstitute;
 using NUnit.Framework;
 

@@ -1,34 +1,7 @@
 ﻿using Microsoft.JSInterop;
+using BlazorClient.Application.Services;
 
 namespace BlazorClient.Services;
-
-/// <summary>
-/// Interface for soft body physics.
-/// Extends IPhysicsService and segregated interfaces for full SOLID compliance.
-/// </summary>
-public interface ISoftPhysicsService : IPhysicsService, IClothPhysicsService, 
-    IVolumetricPhysicsService, IVertexPinningService, ISoftBodyVertexDataService
-{
-    /// <summary>
-    /// Initializes the soft body physics world.
-    /// </summary>
-    Task InitializeAsync(SimulationSettings settings);
-
-    /// <summary>
-    /// Removes a soft body from the physics world.
-    /// </summary>
-    Task RemoveSoftBodyAsync(string id);
-
-    /// <summary>
-    /// Updates soft body material properties.
-    /// </summary>
-    Task UpdateSoftBodyAsync(SoftBody body);
-    
-    /// <summary>
-    /// Gets whether soft body physics is available (cached, non-async).
-    /// </summary>
-    bool IsAvailable { get; }
-}
 
 /// <summary>
 /// Deformed vertex data for a soft body.
@@ -55,7 +28,9 @@ public class SoftBodyVertexData
 /// Implementation of soft body physics service.
 /// Optimized for minimal interop overhead.
 /// </summary>
-public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
+public class SoftPhysicsService : 
+    BlazorClient.Application.Services.ISoftPhysicsService, 
+    IAsyncDisposable
 {
     private readonly IJSRuntime _jsRuntime;
     private bool _initialized;
@@ -155,7 +130,9 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.removeSoftBody", id);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Updates soft body material properties.
+    /// </summary>
     public async Task UpdateSoftBodyAsync(SoftBody body)
     {
         if (!IsAvailable) return;
@@ -209,27 +186,36 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
     }
 
     /// <inheritdoc />
-    public async Task<Dictionary<string, SoftBodyVertexData>> GetDeformedVerticesAsync()
+    public async Task<Dictionary<string, BlazorClient.Application.Services.SoftBodyVertexData>> GetDeformedVerticesAsync()
     {
         if (!IsAvailable) 
-            return new Dictionary<string, SoftBodyVertexData>();
+            return new Dictionary<string, BlazorClient.Application.Services.SoftBodyVertexData>();
 
         // Single batched call to get all vertex data
-        return await _jsRuntime.InvokeAsync<Dictionary<string, SoftBodyVertexData>>(
+        var result = await _jsRuntime.InvokeAsync<Dictionary<string, SoftBodyVertexData>>(
             "SoftPhysicsModule.getAllDeformedVertices");
+        
+        // Convert to Application layer type
+        return result.ToDictionary(
+            kvp => kvp.Key,
+            kvp => new BlazorClient.Application.Services.SoftBodyVertexData
+            {
+                Vertices = kvp.Value.Vertices,
+                Normals = kvp.Value.Normals ?? Array.Empty<float>()
+            });
     }
 
     /// <inheritdoc />
-    public async Task<SoftBodyVertexData> GetDeformedVerticesAsync(string id)
+    public async Task<BlazorClient.Application.Services.SoftBodyVertexData> GetDeformedVerticesAsync(string id)
     {
         if (!IsAvailable) 
-            return new SoftBodyVertexData();
+            return new BlazorClient.Application.Services.SoftBodyVertexData();
 
         var vertices = await _jsRuntime.InvokeAsync<float[]?>("SoftPhysicsModule.getDeformedVertices", id);
-        return new SoftBodyVertexData 
+        return new BlazorClient.Application.Services.SoftBodyVertexData 
         { 
             Vertices = vertices ?? Array.Empty<float>(),
-            Normals = null
+            Normals = Array.Empty<float>()
         };
     }
 

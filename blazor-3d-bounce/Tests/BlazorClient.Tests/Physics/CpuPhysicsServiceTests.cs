@@ -74,7 +74,10 @@ public class CpuPhysicsServiceTests
         {
             await _physics.StepAsync(1f / 120f);
             var batch = await _physics.GetTransformBatchAsync();
-            heights[i] = batch.Transforms[1]; // Y position
+            if (batch.TryGetValue("test-sphere", out var transform))
+            {
+                heights[i] = transform.Position.Y;
+            }
         }
 
         // Assert
@@ -143,11 +146,8 @@ public class CpuPhysicsServiceTests
         var batch = await _physics.GetTransformBatchAsync();
 
         // Assert
-        var sphere1Idx = Array.IndexOf(batch.Ids, "sphere1");
-        var sphere2Idx = Array.IndexOf(batch.Ids, "sphere2");
-
-        var pos1X = batch.Transforms[sphere1Idx * 7];
-        var pos2X = batch.Transforms[sphere2Idx * 7];
+        var pos1X = batch["sphere1"].Position.X;
+        var pos2X = batch["sphere2"].Position.X;
 
         // Spheres should be moving apart after collision
         Assert.That(pos1X, Is.LessThan(-2), "sphere1 should have bounced back");
@@ -195,10 +195,9 @@ public class CpuPhysicsServiceTests
             {
                 var batch = await _physics.GetTransformBatchAsync();
                 var totalEnergy = 0f;
-                for (int j = 0; j < batch.Ids.Length; j++)
+                foreach (var kvp in batch)
                 {
-                    var y = batch.Transforms[j * 7 + 1];
-                    totalEnergy += y * 9.81f;
+                    totalEnergy += kvp.Value.Position.Y * 9.81f;
                 }
                 energyHistory.Add(totalEnergy);
             }
@@ -209,8 +208,7 @@ public class CpuPhysicsServiceTests
         // Assert
         for (int i = 0; i < 3; i++)
         {
-            var idx = Array.IndexOf(batch2.Ids, $"box{i}");
-            var y = batch2.Transforms[idx * 7 + 1];
+            var y = batch2[$"box{i}"].Position.Y;
             var expectedY = 0.5f + i * 1.0f;
 
             Assert.That(y, Is.EqualTo(expectedY).Within(0.5f), $"box{i} should be near resting position");
@@ -258,8 +256,10 @@ public class CpuPhysicsServiceTests
         {
             await _physics.StepAsync(1f / 60f);
             var batch = await _physics.GetTransformBatchAsync();
-            var y = batch.Transforms[1];
-            minY = Math.Min(minY, y);
+            if (batch.TryGetValue("fast-sphere", out var transform))
+            {
+                minY = Math.Min(minY, transform.Position.Y);
+            }
         }
 
         // Assert
@@ -295,7 +295,7 @@ public class CpuPhysicsServiceTests
         await _physics.StepAsync(1f / 120f);
 
         var batch = await _physics.GetTransformBatchAsync();
-        var x = batch.Transforms[0];
+        var x = batch["impulse-sphere"].Position.X;
 
         // Assert
         Assert.That(x, Is.GreaterThan(0), "sphere should have moved in X direction");
@@ -335,11 +335,12 @@ public class CpuPhysicsServiceTests
         await _physics.ResetAsync();
 
         var batch = await _physics.GetTransformBatchAsync();
+        var transform = batch["reset-sphere"];
 
         // Assert
-        Assert.That(batch.Transforms[0], Is.EqualTo(initialPosition.X).Within(0.01f));
-        Assert.That(batch.Transforms[1], Is.EqualTo(initialPosition.Y).Within(0.01f));
-        Assert.That(batch.Transforms[2], Is.EqualTo(initialPosition.Z).Within(0.01f));
+        Assert.That(transform.Position.X, Is.EqualTo(initialPosition.X).Within(0.01f));
+        Assert.That(transform.Position.Y, Is.EqualTo(initialPosition.Y).Within(0.01f));
+        Assert.That(transform.Position.Z, Is.EqualTo(initialPosition.Z).Within(0.01f));
     }
 
     [Test]
@@ -388,8 +389,7 @@ public class CpuPhysicsServiceTests
         }
 
         var batch = await _physics.GetTransformBatchAsync();
-        var sphereIdx = Array.IndexOf(batch.Ids, "sphere");
-        var sphereX = batch.Transforms[sphereIdx * 7];
+        var sphereX = batch["sphere"].Position.X;
 
         // Assert
         Assert.That(sphereX, Is.LessThan(0), "sphere should have bounced off box");

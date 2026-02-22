@@ -1,13 +1,26 @@
-using BlazorClient.Domain.Common;
+﻿using BlazorClient.Domain.Common;
 using BlazorClient.Application.Commands;
+using BlazorClient.Application.Services;
 using System.Diagnostics;
 
 namespace BlazorClient.Services.Commands;
 
 /// <summary>
 /// Decorator for command dispatcher that adds logging and telemetry.
-/// Follows the Decorator pattern for cross-cutting concerns.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Follows the Decorator pattern to add cross-cutting concerns (logging,
+/// timing, history tracking) without modifying the base dispatcher.
+/// </para>
+/// <para>
+/// <strong>Architecture Layer:</strong> Presentation/Services Layer.
+/// </para>
+/// <para>
+/// <strong>Design Pattern:</strong> Decorator - wraps an inner
+/// <see cref="ICommandDispatcher"/> and adds behavior.
+/// </para>
+/// </remarks>
 public class LoggingCommandDispatcher : ICommandDispatcher
 {
     private readonly ICommandDispatcher _inner;
@@ -16,6 +29,12 @@ public class LoggingCommandDispatcher : ICommandDispatcher
     private readonly int _maxHistorySize;
     private readonly object _lock = new();
 
+    /// <summary>
+    /// Initializes a new logging command dispatcher.
+    /// </summary>
+    /// <param name="inner">The inner dispatcher to wrap.</param>
+    /// <param name="performanceMonitor">The performance monitor for timing.</param>
+    /// <param name="maxHistorySize">Maximum number of history entries to retain.</param>
     public LoggingCommandDispatcher(
         ICommandDispatcher inner, 
         IPerformanceMonitor performanceMonitor,

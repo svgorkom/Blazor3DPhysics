@@ -1011,6 +1011,114 @@
         }
     }
     
+    /**
+     * Creates a ground plane for physics collision.
+     * The ground is implemented as a static infinite plane at Y=0.
+     * @param {number} restitution - Bounciness of the ground (0-1)
+     * @param {number} friction - Friction coefficient of the ground
+     */
+    function createGround(restitution = 0.3, friction = 0.5) {
+        if (!initialized) {
+            console.warn('GPU physics not initialized - cannot create ground');
+            return;
+        }
+        
+        // Store ground parameters for the ground collision shader
+        // The ground collision is handled in the testGroundCollisions shader
+        // which tests all bodies against Y=0 plane
+        simParams.groundRestitution = restitution;
+        simParams.groundFriction = friction;
+        
+        console.log(`Ground plane created with restitution=${restitution}, friction=${friction}`);
+    }
+    
+    /**
+     * Updates properties of an existing rigid body.
+     * @param {Object} updates - Object containing id and properties to update
+     */
+    function updateRigidBody(updates) {
+        if (!initialized) return;
+        
+        const id = updates.id;
+        const index = bodyIndexMap.get(id);
+        if (index === undefined) {
+            console.warn(`Cannot update body '${id}' - not found`);
+            return;
+        }
+        
+        const body = bodyData.get(id);
+        if (!body) return;
+        
+        // Update mass/inverseMass
+        if (updates.mass !== undefined) {
+            body.inverseMass = updates.mass > 0 ? 1.0 / updates.mass : 0;
+        }
+        
+        // Update material properties
+        if (updates.restitution !== undefined) {
+            body.restitution = updates.restitution;
+        }
+        if (updates.staticFriction !== undefined || updates.dynamicFriction !== undefined) {
+            body.friction = updates.staticFriction ?? updates.dynamicFriction ?? body.friction;
+        }
+        
+        // Update damping
+        if (updates.linearDamping !== undefined) {
+            body.linearDamping = updates.linearDamping;
+        }
+        if (updates.angularDamping !== undefined) {
+            body.angularDamping = updates.angularDamping;
+        }
+        
+        // Update CCD flag
+        if (updates.enableCCD !== undefined) {
+            if (updates.enableCCD) {
+                body.flags |= FLAG_CCD_ENABLED;
+            } else {
+                body.flags &= ~FLAG_CCD_ENABLED;
+            }
+        }
+        
+        // Re-upload to GPU
+        uploadBody(index, body);
+    }
+    
+    /**
+     * Updates the transform (position and rotation) of a rigid body.
+     * @param {string} id - The body ID
+     * @param {number[]} position - Position as [x, y, z]
+     * @param {number[]} rotation - Rotation as quaternion [x, y, z, w]
+     */
+    function updateTransform(id, position, rotation) {
+        if (!initialized) return;
+        
+        const index = bodyIndexMap.get(id);
+        if (index === undefined) {
+            console.warn(`Cannot update transform for '${id}' - not found`);
+            return;
+        }
+        
+        const body = bodyData.get(id);
+        if (!body) return;
+        
+        // Update position
+        if (position) {
+            body.position = position;
+        }
+        
+        // Update rotation
+        if (rotation) {
+            body.rotation = rotation;
+        }
+        
+        // Reset velocities when teleporting
+        body.linearVelocity = [0, 0, 0];
+        body.angularVelocity = [0, 0, 0];
+        
+        // Re-upload to GPU
+        uploadBody(index, body);
+    }
+    
     function reset() {
         bodyData.clear();
         bodyIndexMap.clear();
@@ -1055,6 +1163,9 @@
         initialize,
         createRigidBody,
         removeRigidBody,
+        updateRigidBody,
+        createGround,
+        updateTransform,
         step,
         getTransformBatch,
         getMetrics,

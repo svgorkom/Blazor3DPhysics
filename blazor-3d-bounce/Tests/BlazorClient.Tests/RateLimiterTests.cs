@@ -1,4 +1,5 @@
-﻿using BlazorClient.Services;
+﻿using BlazorClient.Application.Services;
+using BlazorClient.Infrastructure.Services;
 using NUnit.Framework;
 
 namespace BlazorClient.Tests;

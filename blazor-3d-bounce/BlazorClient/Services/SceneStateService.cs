@@ -1,114 +1,25 @@
-﻿namespace BlazorClient.Services;
+﻿using BlazorClient.Domain.Models;
 
-/// <summary>
-/// Interface for managing scene state and objects.
-/// </summary>
-public interface ISceneStateService
-{
-    /// <summary>
-    /// Current simulation settings.
-    /// </summary>
-    SimulationSettings Settings { get; }
-
-    /// <summary>
-    /// Current render settings.
-    /// </summary>
-    RenderSettings RenderSettings { get; }
-
-    /// <summary>
-    /// All rigid bodies in the scene.
-    /// </summary>
-    IReadOnlyList<RigidBody> RigidBodies { get; }
-
-    /// <summary>
-    /// All soft bodies in the scene.
-    /// </summary>
-    IReadOnlyList<SoftBody> SoftBodies { get; }
-
-    /// <summary>
-    /// Currently selected object ID.
-    /// </summary>
-    string? SelectedObjectId { get; }
-
-    /// <summary>
-    /// Gets the selected rigid body if one is selected.
-    /// </summary>
-    RigidBody? SelectedRigidBody { get; }
-
-    /// <summary>
-    /// Gets the selected soft body if one is selected.
-    /// </summary>
-    SoftBody? SelectedSoftBody { get; }
-
-    /// <summary>
-    /// Current performance statistics.
-    /// </summary>
-    PerformanceStats Stats { get; }
-
-    /// <summary>
-    /// Event raised when state changes.
-    /// </summary>
-    event Action? OnStateChanged;
-
-    /// <summary>
-    /// Adds a rigid body to the scene.
-    /// </summary>
-    void AddRigidBody(RigidBody body);
-
-    /// <summary>
-    /// Adds a soft body to the scene.
-    /// </summary>
-    void AddSoftBody(SoftBody body);
-
-    /// <summary>
-    /// Removes an object from the scene.
-    /// </summary>
-    void RemoveObject(string id);
-
-    /// <summary>
-    /// Clears all objects from the scene.
-    /// </summary>
-    void ClearScene();
-
-    /// <summary>
-    /// Selects an object by ID.
-    /// </summary>
-    void SelectObject(string? id);
-
-    /// <summary>
-    /// Updates simulation settings.
-    /// </summary>
-    void UpdateSettings(SimulationSettings settings);
-
-    /// <summary>
-    /// Updates render settings.
-    /// </summary>
-    void UpdateRenderSettings(RenderSettings settings);
-
-    /// <summary>
-    /// Updates performance statistics.
-    /// </summary>
-    void UpdateStats(PerformanceStats stats);
-
-    /// <summary>
-    /// Loads a scene preset.
-    /// </summary>
-    void LoadPreset(ScenePreset preset);
-
-    /// <summary>
-    /// Exports the current scene as a preset.
-    /// </summary>
-    ScenePreset ExportPreset(string name);
-
-    /// <summary>
-    /// Notifies that state has changed.
-    /// </summary>
-    void NotifyStateChanged();
-}
+namespace BlazorClient.Services;
 
 /// <summary>
 /// Implementation of scene state management.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Provides centralized state management for all scene objects, settings,
+/// and selection state. Acts as a single source of truth for the UI.
+/// </para>
+/// <para>
+/// <strong>Architecture Layer:</strong> Presentation/Services Layer.
+/// Implements the extended <see cref="ISceneStateService"/> interface
+/// which inherits from <see cref="BlazorClient.Application.Services.ISceneStateService"/>.
+/// </para>
+/// <para>
+/// <strong>Thread Safety:</strong> Not thread-safe. Designed for Blazor
+/// WebAssembly's single-threaded environment.
+/// </para>
+/// </remarks>
 public class SceneStateService : ISceneStateService
 {
     private readonly List<RigidBody> _rigidBodies = new();
@@ -118,21 +29,36 @@ public class SceneStateService : ISceneStateService
     private PerformanceStats _stats = new();
     private string? _selectedObjectId;
 
+    /// <inheritdoc />
     public SimulationSettings Settings => _settings;
+
+    /// <inheritdoc />
     public RenderSettings RenderSettings => _renderSettings;
+
+    /// <inheritdoc />
     public IReadOnlyList<RigidBody> RigidBodies => _rigidBodies;
+
+    /// <inheritdoc />
     public IReadOnlyList<SoftBody> SoftBodies => _softBodies;
+
+    /// <inheritdoc />
     public string? SelectedObjectId => _selectedObjectId;
+
+    /// <inheritdoc />
     public PerformanceStats Stats => _stats;
 
+    /// <inheritdoc />
     public RigidBody? SelectedRigidBody => 
         _selectedObjectId != null ? _rigidBodies.FirstOrDefault(b => b.Id == _selectedObjectId) : null;
 
+    /// <inheritdoc />
     public SoftBody? SelectedSoftBody => 
         _selectedObjectId != null ? _softBodies.FirstOrDefault(b => b.Id == _selectedObjectId) : null;
 
+    /// <inheritdoc />
     public event Action? OnStateChanged;
 
+    /// <inheritdoc />
     public void AddRigidBody(RigidBody body)
     {
         _rigidBodies.Add(body);
@@ -140,6 +66,7 @@ public class SceneStateService : ISceneStateService
         NotifyStateChanged();
     }
 
+    /// <inheritdoc />
     public void AddSoftBody(SoftBody body)
     {
         _softBodies.Add(body);
@@ -147,6 +74,7 @@ public class SceneStateService : ISceneStateService
         NotifyStateChanged();
     }
 
+    /// <inheritdoc />
     public void RemoveObject(string id)
     {
         var rigidBody = _rigidBodies.FirstOrDefault(b => b.Id == id);
@@ -171,6 +99,7 @@ public class SceneStateService : ISceneStateService
         NotifyStateChanged();
     }
 
+    /// <inheritdoc />
     public void ClearScene()
     {
         _rigidBodies.Clear();
@@ -181,6 +110,7 @@ public class SceneStateService : ISceneStateService
         NotifyStateChanged();
     }
 
+    /// <inheritdoc />
     public void SelectObject(string? id)
     {
         // Deselect previous
@@ -207,18 +137,31 @@ public class SceneStateService : ISceneStateService
         NotifyStateChanged();
     }
 
+    /// <inheritdoc />
+    public SceneObject? GetObject(string id)
+    {
+        var rigidBody = _rigidBodies.FirstOrDefault(b => b.Id == id);
+        if (rigidBody != null) return rigidBody;
+
+        var softBody = _softBodies.FirstOrDefault(b => b.Id == id);
+        return softBody;
+    }
+
+    /// <inheritdoc />
     public void UpdateSettings(SimulationSettings settings)
     {
         _settings = settings;
         NotifyStateChanged();
     }
 
+    /// <inheritdoc />
     public void UpdateRenderSettings(RenderSettings settings)
     {
         _renderSettings = settings;
         NotifyStateChanged();
     }
 
+    /// <inheritdoc />
     public void UpdateStats(PerformanceStats stats)
     {
         _stats = stats;
@@ -227,6 +170,7 @@ public class SceneStateService : ISceneStateService
         // Don't notify for stats to avoid unnecessary rerenders
     }
 
+    /// <inheritdoc />
     public void LoadPreset(ScenePreset preset)
     {
         ClearScene();
@@ -250,6 +194,13 @@ public class SceneStateService : ISceneStateService
         NotifyStateChanged();
     }
 
+    /// <inheritdoc />
+    public ScenePreset ExportToPreset()
+    {
+        return ExportPreset("Untitled");
+    }
+
+    /// <inheritdoc />
     public ScenePreset ExportPreset(string name)
     {
         return new ScenePreset
@@ -263,6 +214,7 @@ public class SceneStateService : ISceneStateService
         };
     }
 
+    /// <inheritdoc />
     public void NotifyStateChanged()
     {
         OnStateChanged?.Invoke();

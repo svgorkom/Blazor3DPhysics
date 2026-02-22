@@ -1,96 +1,67 @@
-using BlazorClient.Domain.Models;
+﻿using BlazorClient.Domain.Models;
 using BlazorClient.Application.Events;
+using BlazorClient.Application.Services;
 
 namespace BlazorClient.Services;
-
-/// <summary>
-/// Interface for the physics simulation loop.
-/// Follows Single Responsibility Principle - only handles simulation timing and coordination.
-/// </summary>
-public interface ISimulationLoopService : IAsyncDisposable
-{
-    /// <summary>
-    /// Event raised when simulation state changes (for UI updates).
-    /// </summary>
-    event Action? OnSimulationStateChanged;
-
-    /// <summary>
-    /// Current frames per second.
-    /// </summary>
-    float Fps { get; }
-
-    /// <summary>
-    /// Time spent in physics calculations (ms).
-    /// </summary>
-    float PhysicsTimeMs { get; }
-
-    /// <summary>
-    /// Whether the simulation loop is running.
-    /// </summary>
-    bool IsRunning { get; }
-
-    /// <summary>
-    /// Starts the simulation loop.
-    /// </summary>
-    Task StartAsync();
-
-    /// <summary>
-    /// Stops the simulation loop.
-    /// </summary>
-    Task StopAsync();
-
-    /// <summary>
-    /// Executes a single simulation step (when paused).
-    /// </summary>
-    Task StepOnceAsync();
-}
 
 /// <summary>
 /// Implementation of the simulation loop service.
 /// Coordinates physics stepping and transform synchronization.
 /// Optimized to minimize interop overhead.
 /// </summary>
-public class SimulationLoopService : ISimulationLoopService
+public class SimulationLoopService : BlazorClient.Application.Services.ISimulationLoopService
 {
     private readonly IRigidPhysicsService _rigidPhysics;
     private readonly ISoftPhysicsService _softPhysics;
-    private readonly IInteropService _interop;
     private readonly ISceneStateService _sceneState;
     private readonly IPerformanceMonitor _performanceMonitor;
     private readonly IEventAggregator _events;
-    private readonly ArrayPool<float> _transformPool;
 
     private PeriodicTimer? _simulationTimer;
     private CancellationTokenSource? _timerCts;
     private DateTime _lastFrameTime = DateTime.UtcNow;
     private float _accumulator;
     private bool _isRunning;
+    private bool _isPaused;
     
     // Frame skip for soft body sync (reduce interop frequency)
     private int _frameCounter;
     private const int SoftBodySyncInterval = 2; // Sync every 2 frames
 
-    public event Action? OnSimulationStateChanged;
+    /// <inheritdoc />
+    public bool IsPaused 
+    { 
+        get => _isPaused; 
+        set => _isPaused = value; 
+    }
+
+    /// <inheritdoc />
     public float Fps => _performanceMonitor.GetSnapshot().Fps;
+
+    /// <inheritdoc />
     public float PhysicsTimeMs => _performanceMonitor.GetAverageTiming("Physics");
+
+    /// <inheritdoc />
     public bool IsRunning => _isRunning;
+
+    /// <inheritdoc />
+    public event Action<float>? OnTick;
+
+    /// <inheritdoc />
+    public event Action? OnSimulationStateChanged;
 
     public SimulationLoopService(
         IRigidPhysicsService rigidPhysics,
         ISoftPhysicsService softPhysics,
-        IInteropService interop,
         ISceneStateService sceneState,
         IPerformanceMonitor performanceMonitor,
-        IEventAggregator events,
-        ArrayPool<float> transformPool)
+        IEventAggregator events)
     {
         _rigidPhysics = rigidPhysics;
         _softPhysics = softPhysics;
-        _interop = interop;
         _sceneState = sceneState;
         _performanceMonitor = performanceMonitor;
         _events = events;
-        _transformPool = transformPool;
     }
 
     /// <inheritdoc />
@@ -124,17 +95,15 @@ public class SimulationLoopService : ISimulationLoopService
     /// <inheritdoc />
     public async Task StepOnceAsync()
     {
+        var deltaTime = _sceneState.Settings.TimeStep;
+        
         using (_performanceMonitor.MeasureTiming("Physics"))
         {
-            await ExecutePhysicsStepAsync(_sceneState.Settings.TimeStep);
+            await ExecutePhysicsStepAsync(deltaTime);
         }
 
-        using (_performanceMonitor.MeasureTiming("Interop"))
-        {
-            await SynchronizeTransformsAsync(true);
-        }
-
-        PublishPhysicsEvent(_sceneState.Settings.TimeStep);
+        PublishPhysicsEvent(deltaTime);
+        OnTick?.Invoke(deltaTime);
         OnSimulationStateChanged?.Invoke();
     }
 
@@ -166,7 +135,7 @@ public class SimulationLoopService : ISimulationLoopService
 
     private async Task SimulationTickAsync()
     {
-        if (_sceneState.Settings.IsPaused) return;
+        if (_isPaused) return;
 
         try
         {
@@ -198,15 +167,6 @@ public class SimulationLoopService : ISimulationLoopService
                     stepsThisFrame++;
                 }
 
-                // Synchronize transforms with rendering
-                // Soft bodies sync less frequently to reduce interop overhead
-                var syncSoftBodies = (_frameCounter % SoftBodySyncInterval) == 0;
-                
-                using (_performanceMonitor.MeasureTiming("Interop"))
-                {
-                    await SynchronizeTransformsAsync(syncSoftBodies);
-                }
-
                 // Update performance stats
                 _performanceMonitor.RecordFrame();
                 _performanceMonitor.UpdateBodyCounts(
@@ -216,7 +176,9 @@ public class SimulationLoopService : ISimulationLoopService
                 // Publish physics event for interested subscribers
                 if (stepsThisFrame > 0)
                 {
-                    PublishPhysicsEvent(fixedDt * stepsThisFrame);
+                    var totalDelta = fixedDt * stepsThisFrame;
+                    PublishPhysicsEvent(totalDelta);
+                    OnTick?.Invoke(totalDelta);
                 }
 
                 OnSimulationStateChanged?.Invoke();
@@ -230,37 +192,8 @@ public class SimulationLoopService : ISimulationLoopService
 
     private async Task ExecutePhysicsStepAsync(float deltaTime)
     {
-        // Run rigid and soft physics
-        // Use cached IsAvailable to avoid async call
         await _rigidPhysics.StepAsync(deltaTime);
-
-        if (_softPhysics.IsAvailable)
-        {
-            await _softPhysics.StepAsync(deltaTime);
-        }
-    }
-
-    private async Task SynchronizeTransformsAsync(bool includeSoftBodies)
-    {
-        // Get rigid body transforms
-        var rigidBatch = await _rigidPhysics.GetTransformBatchAsync();
-        if (rigidBatch.Ids.Length > 0)
-        {
-            await _interop.CommitRigidTransformsAsync(rigidBatch.Transforms, rigidBatch.Ids);
-        }
-
-        // Get soft body vertices - only on scheduled frames
-        if (includeSoftBodies && _softPhysics.IsAvailable && _sceneState.SoftBodies.Count > 0)
-        {
-            // Single batched call to get all vertices
-            var softVertices = await _softPhysics.GetDeformedVerticesAsync();
-            
-            // Batch commit all soft body data
-            if (softVertices.Count > 0)
-            {
-                await _interop.CommitAllSoftVerticesAsync(softVertices);
-            }
-        }
+        await _softPhysics.StepAsync(deltaTime);
     }
 
     private void PublishPhysicsEvent(float deltaTime)

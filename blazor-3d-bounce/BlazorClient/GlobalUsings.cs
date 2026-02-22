@@ -30,7 +30,7 @@ global using SoftBodyPreset = BlazorClient.Domain.Models.SoftBodyPreset;
 global using PhysicsMaterial = BlazorClient.Domain.Models.PhysicsMaterial;
 global using SoftBodyMaterial = BlazorClient.Domain.Models.SoftBodyMaterial;
 
-// Events
+// Events (from Application layer)
 global using IEventAggregator = BlazorClient.Application.Events.IEventAggregator;
 global using IEvent = BlazorClient.Application.Events.IEvent;
 global using ObjectSpawnedEvent = BlazorClient.Application.Events.ObjectSpawnedEvent;
@@ -45,3 +45,18 @@ global using SceneLoadedEvent = BlazorClient.Application.Events.SceneLoadedEvent
 global using InitializationCompleteEvent = BlazorClient.Application.Events.InitializationCompleteEvent;
 global using ErrorOccurredEvent = BlazorClient.Application.Events.ErrorOccurredEvent;
 global using ErrorSeverity = BlazorClient.Application.Events.ErrorSeverity;
+
+// Application Layer Service Interfaces (used for DI injection)
+global using IRenderingService = BlazorClient.Application.Services.IRenderingService;
+global using IRigidPhysicsService = BlazorClient.Application.Services.IRigidPhysicsService;
+global using ISoftPhysicsService = BlazorClient.Application.Services.ISoftPhysicsService;
+global using ISceneStateService = BlazorClient.Application.Services.ISceneStateService;
+global using ISimulationLoopService = BlazorClient.Application.Services.ISimulationLoopService;
+global using IInteropService = BlazorClient.Application.Services.IInteropService;
+global using IGpuPhysicsService = BlazorClient.Application.Services.IGpuPhysicsService;
+global using IPhysicsService = BlazorClient.Application.Services.IPhysicsService;
+global using IClothPhysicsService = BlazorClient.Application.Services.IClothPhysicsService;
+global using IVolumetricPhysicsService = BlazorClient.Application.Services.IVolumetricPhysicsService;
+global using IVertexPinningService = BlazorClient.Application.Services.IVertexPinningService;
+global using IPerformanceMonitor = BlazorClient.Application.Services.IPerformanceMonitor;
+global using IRateLimiter = BlazorClient.Application.Services.IRateLimiter;

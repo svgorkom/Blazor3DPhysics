@@ -1,47 +1,7 @@
-using Microsoft.JSInterop;
+﻿using Microsoft.JSInterop;
+using BlazorClient.Application.Services;
 
 namespace BlazorClient.Services;
-
-/// <summary>
-/// Interface for JavaScript interop batching and communication.
-/// </summary>
-public interface IInteropService
-{
-    /// <summary>
-    /// Initializes the JavaScript modules (rendering and physics).
-    /// </summary>
-    Task InitializeAsync(string canvasId);
-
-    /// <summary>
-    /// Commits a batch of transform updates for rigid bodies.
-    /// </summary>
-    Task CommitRigidTransformsAsync(float[] transforms, string[] ids);
-
-    /// <summary>
-    /// Commits deformed vertex data for a single soft body.
-    /// </summary>
-    Task CommitSoftVerticesAsync(string id, float[] vertices, float[]? normals = null);
-
-    /// <summary>
-    /// Commits deformed vertex data for all soft bodies in a single call.
-    /// </summary>
-    Task CommitAllSoftVerticesAsync(Dictionary<string, SoftBodyVertexData> vertexData);
-
-    /// <summary>
-    /// Applies a single frame update (rigid transforms + soft vertices).
-    /// </summary>
-    Task ApplyFrameAsync(FrameData frameData);
-
-    /// <summary>
-    /// Gets the current performance statistics.
-    /// </summary>
-    Task<PerformanceStatsDto> GetPerformanceStatsAsync();
-
-    /// <summary>
-    /// Disposes resources.
-    /// </summary>
-    ValueTask DisposeAsync();
-}
 
 /// <summary>
 /// Frame data for batched updates.
@@ -75,10 +35,10 @@ public class PerformanceStatsDto
 }
 
 /// <summary>
-/// Implementation of JavaScript interop service with batching support.
-/// Optimized to minimize number of JS interop calls.
+/// Implementation of JavaScript interop service.
+/// Implements the Application layer IInteropService interface.
 /// </summary>
-public class InteropService : IInteropService, IAsyncDisposable
+public class InteropService : BlazorClient.Application.Services.IInteropService
 {
     private readonly IJSRuntime _jsRuntime;
     private bool _initialized;
@@ -89,6 +49,27 @@ public class InteropService : IInteropService, IAsyncDisposable
     }
 
     /// <inheritdoc />
+    public async Task InitializeAsync()
+    {
+        if (_initialized) return;
+
+        try
+        {
+            // Initialize general interop bridge
+            await _jsRuntime.InvokeVoidAsync("PhysicsInterop.initialize");
+            _initialized = true;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Failed to initialize interop: {ex.Message}");
+            // Don't throw - interop may not be required for all operations
+            _initialized = true;
+        }
+    }
+
+    /// <summary>
+    /// Initializes with a canvas ID for rendering.
+    /// </summary>
     public async Task InitializeAsync(string canvasId)
     {
         if (_initialized) return;
@@ -106,6 +87,20 @@ public class InteropService : IInteropService, IAsyncDisposable
     }
 
     /// <inheritdoc />
+    public async Task InvokeVoidAsync(string identifier, params object?[] args)
+    {
+        await _jsRuntime.InvokeVoidAsync(identifier, args);
+    }
+
+    /// <inheritdoc />
+    public async Task<T> InvokeAsync<T>(string identifier, params object?[] args)
+    {
+        return await _jsRuntime.InvokeAsync<T>(identifier, args);
+    }
+
+    /// <summary>
+    /// Commits a batch of transform updates for rigid bodies.
+    /// </summary>
     public async Task CommitRigidTransformsAsync(float[] transforms, string[] ids)
     {
         if (!_initialized || ids.Length == 0) return;
@@ -113,7 +108,9 @@ public class InteropService : IInteropService, IAsyncDisposable
         await _jsRuntime.InvokeVoidAsync("PhysicsInterop.updateRigidTransforms", transforms, ids);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Commits deformed vertex data for a single soft body.
+    /// </summary>
     public async Task CommitSoftVerticesAsync(string id, float[] vertices, float[]? normals = null)
     {
         if (!_initialized || vertices.Length == 0) return;
@@ -121,16 +118,19 @@ public class InteropService : IInteropService, IAsyncDisposable
         await _jsRuntime.InvokeVoidAsync("PhysicsInterop.updateSoftBodyVertices", id, vertices, normals);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Commits deformed vertex data for all soft bodies in a single call.
+    /// </summary>
     public async Task CommitAllSoftVerticesAsync(Dictionary<string, SoftBodyVertexData> vertexData)
     {
         if (!_initialized || vertexData.Count == 0) return;
 
-        // Single batched call for all soft bodies
         await _jsRuntime.InvokeVoidAsync("PhysicsInterop.updateAllSoftBodies", vertexData);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Applies a single frame update (rigid transforms + soft vertices).
+    /// </summary>
     public async Task ApplyFrameAsync(FrameData frameData)
     {
         if (!_initialized) return;
@@ -138,7 +138,9 @@ public class InteropService : IInteropService, IAsyncDisposable
         await _jsRuntime.InvokeVoidAsync("PhysicsInterop.applyFrame", frameData);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Gets the current performance statistics.
+    /// </summary>
     public async Task<PerformanceStatsDto> GetPerformanceStatsAsync()
     {
         if (!_initialized)
