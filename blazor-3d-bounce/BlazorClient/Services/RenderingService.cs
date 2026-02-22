@@ -1,5 +1,6 @@
-using BlazorClient.Models;
+﻿using BlazorClient.Models;
 using Microsoft.JSInterop;
+using BlazorClient.Domain.Models;
 
 namespace BlazorClient.Services;
 
@@ -57,11 +58,97 @@ public interface IRenderingService
     /// Resizes the rendering viewport.
     /// </summary>
     Task ResizeAsync();
+    
+    /// <summary>
+    /// Gets information about the active rendering backend.
+    /// </summary>
+    Task<RendererInfo> GetRendererInfoAsync();
+    
+    /// <summary>
+    /// Gets the currently active rendering backend name.
+    /// </summary>
+    Task<string> GetActiveBackendAsync();
+    
+    /// <summary>
+    /// Detects available rendering backends.
+    /// </summary>
+    Task<RendererCapabilities> DetectBackendsAsync();
+    
+    /// <summary>
+    /// Gets performance metrics from the renderer.
+    /// </summary>
+    Task<RendererPerformanceMetrics> GetPerformanceMetricsAsync();
+    
+    /// <summary>
+    /// Runs a performance benchmark comparing available backends.
+    /// </summary>
+    Task<BenchmarkResults> RunBenchmarkAsync(string canvasId);
 
     /// <summary>
     /// Disposes the rendering resources.
     /// </summary>
     ValueTask DisposeAsync();
+}
+
+/// <summary>
+/// Capabilities of available rendering backends.
+/// </summary>
+public class RendererCapabilities
+{
+    public BackendCapability WebGPU { get; set; } = new();
+    public BackendCapability WebGL2 { get; set; } = new();
+    public BackendCapability WebGL { get; set; } = new();
+}
+
+/// <summary>
+/// Capability information for a single backend.
+/// </summary>
+public class BackendCapability
+{
+    public bool IsSupported { get; set; }
+    public string? Vendor { get; set; }
+    public string? Renderer { get; set; }
+    public string? Version { get; set; }
+    public string? ErrorMessage { get; set; }
+}
+
+/// <summary>
+/// Performance metrics from the renderer.
+/// </summary>
+public class RendererPerformanceMetrics
+{
+    public string Backend { get; set; } = "Unknown";
+    public float Fps { get; set; }
+    public float FrameTimeMs { get; set; }
+    public float Percentile95 { get; set; }
+    public float Percentile99 { get; set; }
+    public float MinFrameTime { get; set; }
+    public float MaxFrameTime { get; set; }
+    public int DrawCalls { get; set; }
+    public int TriangleCount { get; set; }
+}
+
+/// <summary>
+/// Results from a rendering benchmark.
+/// </summary>
+public class BenchmarkResults
+{
+    public BenchmarkResult? WebGPU { get; set; }
+    public BenchmarkResult? WebGL2 { get; set; }
+    public string? Recommendation { get; set; }
+    public string? Error { get; set; }
+}
+
+/// <summary>
+/// Benchmark result for a single backend.
+/// </summary>
+public class BenchmarkResult
+{
+    public float AvgFrameTime { get; set; }
+    public float MinFrameTime { get; set; }
+    public float MaxFrameTime { get; set; }
+    public int Iterations { get; set; }
+    public string? Error { get; set; }
 }
 
 /// <summary>
@@ -82,7 +169,23 @@ public class RenderingService : IRenderingService, IAsyncDisposable
     {
         if (_initialized) return;
 
-        await _jsRuntime.InvokeVoidAsync("RenderingModule.initialize", canvasId, settings);
+        // Convert settings to JS-compatible object
+        var jsSettings = new
+        {
+            enableShadows = settings.EnableShadows,
+            shadowMapSize = settings.ShadowMapSize,
+            enableSSAO = settings.EnableSSAO,
+            enableFXAA = settings.EnableFXAA,
+            showGrid = settings.ShowGrid,
+            showAxes = settings.ShowAxes,
+            showWireframe = settings.ShowWireframe,
+            showBoundingBoxes = settings.ShowBoundingBoxes,
+            showDebugOverlay = settings.ShowDebugOverlay,
+            hdriPath = settings.HdriPath,
+            preferredBackend = settings.PreferredBackend.ToString()
+        };
+
+        await _jsRuntime.InvokeVoidAsync("RenderingModule.initialize", canvasId, jsSettings);
         _initialized = true;
     }
 
@@ -191,6 +294,83 @@ public class RenderingService : IRenderingService, IAsyncDisposable
         if (!_initialized) return;
 
         await _jsRuntime.InvokeVoidAsync("RenderingModule.resize");
+    }
+
+    /// <inheritdoc />
+    public async Task<RendererInfo> GetRendererInfoAsync()
+    {
+        if (!_initialized)
+        {
+            return new RendererInfo { Backend = "Not Initialized" };
+        }
+
+        try
+        {
+            return await _jsRuntime.InvokeAsync<RendererInfo>("RenderingModule.getRendererInfo");
+        }
+        catch
+        {
+            return new RendererInfo { Backend = "Unknown" };
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<string> GetActiveBackendAsync()
+    {
+        if (!_initialized) return "Not Initialized";
+
+        try
+        {
+            return await _jsRuntime.InvokeAsync<string>("RenderingModule.getActiveBackend");
+        }
+        catch
+        {
+            return "Unknown";
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<RendererCapabilities> DetectBackendsAsync()
+    {
+        try
+        {
+            return await _jsRuntime.InvokeAsync<RendererCapabilities>("RenderingModule.detectBackends");
+        }
+        catch
+        {
+            return new RendererCapabilities();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<RendererPerformanceMetrics> GetPerformanceMetricsAsync()
+    {
+        if (!_initialized)
+        {
+            return new RendererPerformanceMetrics();
+        }
+
+        try
+        {
+            return await _jsRuntime.InvokeAsync<RendererPerformanceMetrics>("RenderingModule.getPerformanceMetrics");
+        }
+        catch
+        {
+            return new RendererPerformanceMetrics();
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<BenchmarkResults> RunBenchmarkAsync(string canvasId)
+    {
+        try
+        {
+            return await _jsRuntime.InvokeAsync<BenchmarkResults>("RenderingModule.runBenchmark", canvasId);
+        }
+        catch (Exception ex)
+        {
+            return new BenchmarkResults { Error = ex.Message };
+        }
     }
 
     /// <inheritdoc />

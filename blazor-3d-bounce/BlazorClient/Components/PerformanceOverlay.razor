@@ -3,6 +3,10 @@
 <div class="performance-overlay @(IsExpanded ? "expanded" : "collapsed")" @onclick="ToggleExpanded">
     <div class="perf-header">
         <span class="perf-fps @GetFpsClass()">@Fps.ToString("F0") FPS</span>
+        @if (ShowRendererBadge && !string.IsNullOrEmpty(ActiveBackend) && ActiveBackend != "Unknown")
+        {
+            <span class="perf-renderer-badge @GetRendererBadgeClass()">@ActiveBackend</span>
+        }
         <i class="bi @(IsExpanded ? "bi-chevron-up" : "bi-chevron-down") perf-toggle"></i>
     </div>
     
@@ -39,6 +43,29 @@
             <div class="perf-divider"></div>
             
             <div class="perf-row">
+                <span class="perf-label">Renderer</span>
+                <span class="perf-value @GetRendererClass()">@(ActiveBackend ?? "Unknown")</span>
+            </div>
+            
+            @if (!string.IsNullOrEmpty(GpuInfo))
+            {
+                <div class="perf-row">
+                    <span class="perf-label">GPU</span>
+                    <span class="perf-value perf-gpu-info" title="@GpuInfo">@TruncateGpuInfo(GpuInfo)</span>
+                </div>
+            }
+            
+            @if (IsFallbackRenderer)
+            {
+                <div class="perf-row perf-warning-row">
+                    <span class="perf-label"><i class="bi bi-exclamation-triangle"></i></span>
+                    <span class="perf-value perf-warning">Fallback renderer</span>
+                </div>
+            }
+            
+            <div class="perf-divider"></div>
+            
+            <div class="perf-row">
                 <span class="perf-label">Physics Budget</span>
                 <div class="perf-bar">
                     <div class="perf-bar-fill @GetPhysicsBudgetClass()" style="width: @GetPhysicsBudgetPercent()%"></div>
@@ -68,6 +95,30 @@
     [Parameter]
     public int SoftBodyCount { get; set; }
 
+    /// <summary>
+    /// The active rendering backend (WebGPU, WebGL2, WebGL).
+    /// </summary>
+    [Parameter]
+    public string? ActiveBackend { get; set; }
+
+    /// <summary>
+    /// GPU information string.
+    /// </summary>
+    [Parameter]
+    public string? GpuInfo { get; set; }
+
+    /// <summary>
+    /// Whether the renderer is using a fallback backend.
+    /// </summary>
+    [Parameter]
+    public bool IsFallbackRenderer { get; set; }
+
+    /// <summary>
+    /// Whether to show the renderer badge in the header.
+    /// </summary>
+    [Parameter]
+    public bool ShowRendererBadge { get; set; } = true;
+
     private bool IsExpanded { get; set; } = false;
 
     // Target 60 FPS = ~16.67ms per frame
@@ -89,6 +140,22 @@
         _ => "danger"
     };
 
+    private string GetRendererClass() => ActiveBackend switch
+    {
+        "WebGPU" => "good",
+        "WebGL2" => "neutral",
+        "WebGL" => "warning",
+        _ => "neutral"
+    };
+
+    private string GetRendererBadgeClass() => ActiveBackend switch
+    {
+        "WebGPU" => "badge-webgpu",
+        "WebGL2" => "badge-webgl2",
+        "WebGL" => "badge-webgl",
+        _ => "badge-unknown"
+    };
+
     // Physics should take no more than ~8ms of the 16.67ms budget
     private float GetPhysicsBudgetPercent() => Math.Min(100, (PhysicsTimeMs / 8f) * 100);
 
@@ -108,4 +175,10 @@
         <= 100 => "warning",
         _ => "danger"
     };
+
+    private string TruncateGpuInfo(string? info)
+    {
+        if (string.IsNullOrEmpty(info)) return "Unknown";
+        return info.Length > 25 ? info[..22] + "..." : info;
+    }
 }

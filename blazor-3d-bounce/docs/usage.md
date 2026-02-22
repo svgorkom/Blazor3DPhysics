@@ -10,6 +10,15 @@ This guide explains how to use the Blazor 3D Physics application.
 2. Open your browser to `https://localhost:5001`
 3. Wait for the physics engines to initialize (loading indicator)
 
+### Browser Requirements
+
+| Feature | Minimum Browser |
+|---------|-----------------|
+| WebGL2 (Standard) | Chrome 56+, Firefox 51+, Edge 79+ |
+| WebGPU (Best Performance) | Chrome 113+, Edge 113+, Firefox Nightly |
+
+The application automatically selects the best available renderer.
+
 ### Interface Overview
 
 ```
@@ -19,14 +28,27 @@ This guide explains how to use the Blazor 3D Physics application.
 │             │                                   │                          │
 │  Spawn      │                                   │   Inspector              │
 │  Panel      │         3D Viewport               │    Panel                 │
-│             │                                   │                          │
-│  Object     │                                   │  Properties              │
-│  List       │                                   │   Settings               │
-│             │                                   │                          │
+│             │          ┌──────────┐             │                          │
+│  Object     │          │60 FPS    │← Perf       │  Properties              │
+│  List       │          │ WebGPU   │  Overlay    │   Settings               │
+│             │          └──────────┘             │                          │
 ├────────────────────────────────────────────────────────────────────────────┤
 │  FPS: 60 │ Physics: 2.1ms │ Rigid: 5 │ Soft: 2             │ ← Stats       │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
+
+### Performance Overlay
+
+The performance overlay in the top-right of the viewport shows:
+- **FPS**: Current frame rate
+- **Renderer Badge**: Active backend (WebGPU/WebGL2/WebGL)
+
+Click to expand for more details:
+- Physics time
+- Frame time
+- Object counts
+- GPU information
+- Fallback status (if applicable)
 
 ## Spawning Objects
 
@@ -146,11 +168,39 @@ Selected object shows teal highlight.
 
 | Setting | Effect |
 |---------|--------|
+| Preferred Backend | Renderer selection (Auto/WebGPU/WebGL2/WebGL) |
 | Shadows | Toggle shadow rendering |
 | Grid | Show/hide ground grid |
 | Axes | Show/hide axis gizmo |
 | Wireframe | Toggle wireframe mode |
 | FXAA | Anti-aliasing |
+| Show Renderer Info | Display backend in overlay |
+
+## Renderer Selection
+
+### Automatic Selection (Default)
+
+The application automatically selects the best available renderer:
+1. **WebGPU** - Best performance (if available)
+2. **WebGL2** - Standard fallback
+3. **WebGL** - Legacy fallback
+
+### Manual Selection
+
+To force a specific renderer, change "Preferred Backend" in Render Settings:
+- **Auto**: Automatic selection (recommended)
+- **WebGPU**: Force WebGPU (falls back if unavailable)
+- **WebGL2**: Force WebGL2
+- **WebGL**: Force WebGL (legacy)
+
+### Checking Active Renderer
+
+Look at the performance overlay:
+- **Purple badge**: WebGPU active
+- **Cyan badge**: WebGL2 active
+- **Yellow badge**: WebGL active
+
+Click to expand and see GPU details.
 
 ## Using Presets
 
@@ -194,13 +244,22 @@ In the Inspector, select material presets for rigid bodies:
 | FPS | 55+ | 30-55 | <30 |
 | Physics | <4ms | 4-8ms | >8ms |
 
+### Performance Overlay Details
+
+Click the performance overlay to see:
+- **Physics Time**: Time spent in physics calculations
+- **Frame Time**: Total frame time
+- **Renderer**: Active backend with GPU info
+- **Fallback Warning**: Shows if using fallback renderer
+
 ### If Performance Drops
 
-1. Reduce object count
-2. Disable shadows
-3. Lower soft body resolution
-4. Reduce substeps
-5. Disable self-collision
+1. Check active renderer (WebGPU is fastest)
+2. Reduce object count
+3. Disable shadows
+4. Lower soft body resolution
+5. Reduce substeps
+6. Disable self-collision
 
 ## Keyboard Shortcuts
 
@@ -250,6 +309,13 @@ In the Inspector, select material presets for rigid bodies:
 3. Use moderate stiffness (0.3-0.6)
 4. Higher iterations prevent collapse
 
+### Best Performance
+
+1. Use a WebGPU-capable browser (Chrome 113+)
+2. Check that WebGPU badge is showing
+3. Reduce shadow map size
+4. Keep object count reasonable
+
 ## Troubleshooting
 
 ### Objects Fall Through Ground
@@ -267,9 +333,17 @@ In the Inspector, select material presets for rigid bodies:
 
 ### Poor Performance
 
+- Check active renderer in overlay
 - See Performance Monitoring section
 - Reduce active object count
 - Lower quality settings
+- Try a WebGPU-capable browser
+
+### WebGPU Not Working
+
+- Ensure browser is Chrome 113+, Edge 113+, or Firefox Nightly
+- Check `chrome://gpu` for WebGPU status
+- Application will automatically fall back to WebGL2
 
 ### Soft Body Unavailable
 

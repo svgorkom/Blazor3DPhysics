@@ -7,10 +7,10 @@ This document outlines potential future enhancements for the Blazor 3D Physics a
 ### Core Improvements
 
 #### WebGPU Rendering Path
-- [ ] Detect WebGPU availability
-- [ ] Create WebGPU renderer alongside WebGL
-- [ ] Automatic fallback to WebGL2
-- [ ] Performance comparison metrics
+- [x] Detect WebGPU availability
+- [x] Create WebGPU renderer alongside WebGL
+- [x] Automatic fallback to WebGL2
+- [x] Performance comparison metrics
 
 #### Enhanced Model Import
 - [ ] Full GLTF 2.0 support with animations
@@ -45,7 +45,7 @@ This document outlines potential future enhancements for the Blazor 3D Physics a
 
 #### GPU-Accelerated Cloth
 - [ ] Compute shader cloth simulation
-- [ ] Higher resolution support (100×100+)
+- [ ] Higher resolution support (100Ã—100+)
 - [ ] Parallel constraint solving
 - [ ] Wind forces
 

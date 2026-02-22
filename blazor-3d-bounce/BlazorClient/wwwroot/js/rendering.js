@@ -3,6 +3,7 @@
  * Handles 3D scene rendering, camera, lights, and mesh management
  * 
  * OCP Compliance: Mesh and material creation uses registry pattern
+ * WebGPU Support: Automatic detection with fallback to WebGL2
  */
 
 (function() {
@@ -21,6 +22,24 @@
     let softMeshes = new Map();
     let softMeshData = new Map(); // Store original mesh data for rebuilding
     let settings = {};
+    
+    // Renderer backend state
+    let activeBackend = 'Unknown';
+    let backendCapabilities = null;
+    let rendererInfo = {
+        backend: 'Unknown',
+        vendor: null,
+        renderer: null,
+        version: null,
+        isWebGPU: false,
+        isFallback: false,
+        fallbackReason: null
+    };
+
+    // Performance tracking
+    let lastFrameTime = 0;
+    let frameCount = 0;
+    let fpsUpdateInterval = null;
 
     /**
      * Mesh creator registry (OCP - extensible without modification)
@@ -175,6 +194,158 @@
     };
 
     /**
+     * Determine the best rendering backend to use
+     * @param {string} preferredBackend - User preference ('WebGPU', 'WebGL2', 'WebGL', 'Auto')
+     * @returns {Promise<Object>} Backend selection result
+     */
+    async function selectRenderingBackend(preferredBackend = 'Auto') {
+        console.log('Selecting rendering backend, preference:', preferredBackend);
+        
+        // Use WebGPU module if available
+        if (window.WebGPUModule) {
+            const result = await window.WebGPUModule.selectRendererBackend(preferredBackend);
+            backendCapabilities = result;
+            return result;
+        }
+        
+        // Fallback detection without WebGPU module
+        const result = {
+            selectedBackend: 'WebGL2',
+            webgpu: { isSupported: false },
+            webgl2: { isSupported: true },
+            fallbackReason: 'WebGPU module not loaded'
+        };
+        
+        // Basic WebGPU check
+        if (navigator.gpu && (preferredBackend === 'WebGPU' || preferredBackend === 'Auto')) {
+            try {
+                const adapter = await navigator.gpu.requestAdapter();
+                if (adapter && !adapter.isFallbackAdapter) {
+                    result.selectedBackend = 'WebGPU';
+                    result.webgpu.isSupported = true;
+                    result.fallbackReason = null;
+                }
+            } catch (e) {
+                console.log('WebGPU not available:', e.message);
+            }
+        }
+        
+        backendCapabilities = result;
+        return result;
+    }
+
+    /**
+     * Create Babylon.js engine with the appropriate backend
+     * @param {HTMLCanvasElement} canvas - Canvas element
+     * @param {string} backend - Selected backend ('WebGPU', 'WebGL2', 'WebGL')
+     * @param {Object} engineOptions - Engine options
+     * @returns {Promise<BABYLON.Engine>} Babylon.js engine
+     */
+    async function createEngineForBackend(canvas, backend, engineOptions) {
+        console.log('Creating engine for backend:', backend);
+        
+        const baseOptions = {
+            preserveDrawingBuffer: true,
+            stencil: true,
+            antialias: true,
+            ...engineOptions
+        };
+        
+        if (backend === 'WebGPU') {
+            try {
+                // Check if Babylon.js WebGPU engine is available
+                if (BABYLON.WebGPUEngine) {
+                    console.log('Creating WebGPU engine...');
+                    const webgpuEngine = new BABYLON.WebGPUEngine(canvas, baseOptions);
+                    await webgpuEngine.initAsync();
+                    
+                    rendererInfo.backend = 'WebGPU';
+                    rendererInfo.isWebGPU = true;
+                    rendererInfo.isFallback = false;
+                    
+                    // Get adapter info
+                    if (webgpuEngine._adapter) {
+                        const adapterInfo = await webgpuEngine._adapter.requestAdapterInfo();
+                        rendererInfo.vendor = adapterInfo.vendor || 'Unknown';
+                        rendererInfo.renderer = adapterInfo.device || 'WebGPU Device';
+                    }
+                    
+                    console.log('WebGPU engine created successfully');
+                    activeBackend = 'WebGPU';
+                    return webgpuEngine;
+                } else {
+                    console.warn('BABYLON.WebGPUEngine not available, falling back to WebGL2');
+                    rendererInfo.fallbackReason = 'BABYLON.WebGPUEngine not loaded';
+                }
+            } catch (e) {
+                console.error('WebGPU engine creation failed:', e);
+                rendererInfo.fallbackReason = e.message;
+            }
+        }
+        
+        // WebGL2 / WebGL fallback
+        console.log('Creating WebGL engine...');
+        const webglEngine = new BABYLON.Engine(canvas, true, baseOptions);
+        
+        // Determine actual WebGL version
+        const gl = webglEngine._gl;
+        if (gl instanceof WebGL2RenderingContext) {
+            rendererInfo.backend = 'WebGL2';
+            rendererInfo.version = gl.getParameter(gl.VERSION);
+        } else {
+            rendererInfo.backend = 'WebGL';
+            rendererInfo.version = gl ? gl.getParameter(gl.VERSION) : 'Unknown';
+        }
+        
+        rendererInfo.isWebGPU = false;
+        rendererInfo.isFallback = backend === 'WebGPU';
+        
+        // Get renderer info
+        const debugInfo = gl ? gl.getExtension('WEBGL_debug_renderer_info') : null;
+        if (debugInfo) {
+            rendererInfo.vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL);
+            rendererInfo.renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+        }
+        
+        activeBackend = rendererInfo.backend;
+        console.log('WebGL engine created:', rendererInfo.backend);
+        return webglEngine;
+    }
+
+    /**
+     * Start performance tracking
+     */
+    function startPerformanceTracking() {
+        lastFrameTime = performance.now();
+        frameCount = 0;
+        
+        // Update WebGPU module metrics if available
+        if (window.WebGPUModule) {
+            window.WebGPUModule.resetPerformanceMetrics();
+        }
+    }
+
+    /**
+     * Track frame for performance metrics
+     */
+    function trackFrame() {
+        const now = performance.now();
+        const frameTime = now - lastFrameTime;
+        lastFrameTime = now;
+        frameCount++;
+        
+        // Update WebGPU module metrics if available
+        if (window.WebGPUModule) {
+            window.WebGPUModule.recordFrameTime(frameTime);
+            window.WebGPUModule.updatePerformanceMetrics({
+                backend: activeBackend,
+                drawCalls: scene ? scene._activeMeshes.length : 0,
+                triangleCount: scene ? scene._totalVertices / 3 : 0
+            });
+        }
+    }
+
+    /**
      * Initialize the Babylon.js rendering engine
      */
     window.RenderingModule = {
@@ -210,6 +381,72 @@
             softMaterialCreators[type.toLowerCase()] = creator;
         },
 
+        /**
+         * Detect available rendering backends
+         * @returns {Promise<Object>} Detection results
+         */
+        detectBackends: async function() {
+            if (window.WebGPUModule) {
+                return await window.WebGPUModule.getAllCapabilities();
+            }
+            
+            // Basic detection without WebGPU module
+            const webgpuSupported = !!navigator.gpu;
+            const canvas = document.createElement('canvas');
+            const webgl2Supported = !!canvas.getContext('webgl2');
+            const webglSupported = !!canvas.getContext('webgl');
+            
+            return {
+                webgpu: { isSupported: webgpuSupported },
+                webgl2: { isSupported: webgl2Supported },
+                webgl: { isSupported: webglSupported }
+            };
+        },
+
+        /**
+         * Get current renderer information
+         * @returns {Object} Renderer info
+         */
+        getRendererInfo: function() {
+            return { ...rendererInfo };
+        },
+
+        /**
+         * Get current active backend
+         * @returns {string} Backend name
+         */
+        getActiveBackend: function() {
+            return activeBackend;
+        },
+
+        /**
+         * Get performance metrics
+         * @returns {Object} Performance metrics
+         */
+        getPerformanceMetrics: function() {
+            if (window.WebGPUModule) {
+                return window.WebGPUModule.getPerformanceMetrics();
+            }
+            
+            return {
+                backend: activeBackend,
+                fps: engine ? engine.getFps() : 0,
+                frameTimeMs: engine ? 1000 / engine.getFps() : 0
+            };
+        },
+
+        /**
+         * Run performance benchmark
+         * @param {string} canvasId - Canvas element ID
+         * @returns {Promise<Object>} Benchmark results
+         */
+        runBenchmark: async function(canvasId) {
+            if (window.WebGPUModule) {
+                return await window.WebGPUModule.runBenchmark(canvasId);
+            }
+            return { error: 'WebGPU module not loaded' };
+        },
+
         initialize: async function(canvasId, renderSettings) {
             console.log('RenderingModule.initialize called with canvasId:', canvasId);
             
@@ -240,8 +477,13 @@
                 
                 console.log('Canvas dimensions:', canvas.width, 'x', canvas.height);
 
-                // Create engine
-                engine = new BABYLON.Engine(canvas, true, {
+                // Select rendering backend
+                const preferredBackend = settings.preferredBackend || 'Auto';
+                const backendSelection = await selectRenderingBackend(preferredBackend);
+                console.log('Backend selection:', backendSelection);
+
+                // Create engine with selected backend
+                engine = await createEngineForBackend(canvas, backendSelection.selectedBackend, {
                     preserveDrawingBuffer: true,
                     stencil: true,
                     antialias: true
@@ -312,8 +554,12 @@
                     new BABYLON.FxaaPostProcess("fxaa", 1.0, camera);
                 }
 
-                // Start render loop
+                // Start performance tracking
+                startPerformanceTracking();
+
+                // Start render loop with performance tracking
                 engine.runRenderLoop(function() {
+                    trackFrame();
                     scene.render();
                 });
 
@@ -326,6 +572,8 @@
                 engine.resize();
 
                 console.log('Rendering module initialized successfully');
+                console.log('Active backend:', activeBackend);
+                console.log('Renderer info:', rendererInfo);
                 console.log('Scene has', scene.meshes.length, 'meshes');
                 return true;
             } catch (e) {
@@ -565,26 +813,18 @@
             const currentPositions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
             if (!currentPositions) return;
 
-            // Map Ammo.js vertices to Babylon.js mesh vertices
-            // Ammo.js cloth has (resX+1) * (resY+1) vertices
-            // Babylon.js ground has similar structure but may have different ordering
-            
             const physicsVertexCount = vertices.length / 3;
             const meshVertexCount = currentPositions.length / 3;
 
             if (physicsVertexCount === meshVertexCount) {
-                // Direct mapping
                 mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(vertices));
             } else {
-                // Need to interpolate or map vertices
-                // For now, update what we can
                 const updateCount = Math.min(physicsVertexCount, meshVertexCount);
                 const newPositions = new Float32Array(currentPositions.length);
                 
                 for (let i = 0; i < updateCount * 3; i++) {
                     newPositions[i] = vertices[i];
                 }
-                // Keep remaining vertices unchanged
                 for (let i = updateCount * 3; i < currentPositions.length; i++) {
                     newPositions[i] = currentPositions[i];
                 }
@@ -592,11 +832,9 @@
                 mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, newPositions);
             }
 
-            // Update normals
             if (normals && normals.length > 0) {
                 mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(normals));
             } else {
-                // Recompute normals
                 const indices = mesh.getIndices();
                 const positions = mesh.getVerticesData(BABYLON.VertexBuffer.PositionKind);
                 const computedNormals = [];
@@ -615,10 +853,7 @@
             const physicsVertexCount = vertices.length / 3;
             const meshVertexCount = currentPositions.length / 3;
 
-            // Volumetric bodies may have different vertex counts
-            // Use center of mass offset for simple translation
             if (physicsVertexCount !== meshVertexCount) {
-                // Calculate center of physics body
                 let cx = 0, cy = 0, cz = 0;
                 for (let i = 0; i < physicsVertexCount; i++) {
                     cx += vertices[i * 3];
@@ -629,10 +864,8 @@
                 cy /= physicsVertexCount;
                 cz /= physicsVertexCount;
 
-                // Move mesh to center
                 mesh.position.set(cx, cy, cz);
                 
-                // Scale based on bounding radius
                 let maxDist = 0;
                 for (let i = 0; i < physicsVertexCount; i++) {
                     const dx = vertices[i * 3] - cx;
@@ -647,7 +880,6 @@
                     mesh.scaling.setAll(scale);
                 }
             } else {
-                // Direct vertex update
                 mesh.updateVerticesData(BABYLON.VertexBuffer.PositionKind, new Float32Array(vertices));
                 
                 if (normals && normals.length > 0) {
@@ -754,12 +986,16 @@
         },
 
         dispose: function() {
+            if (fpsUpdateInterval) {
+                clearInterval(fpsUpdateInterval);
+            }
             if (engine) {
                 engine.dispose();
             }
             meshes.clear();
             softMeshes.clear();
             softMeshData.clear();
+            activeBackend = 'Unknown';
         }
     };
 

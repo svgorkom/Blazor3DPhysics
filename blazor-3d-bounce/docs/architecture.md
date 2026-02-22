@@ -12,6 +12,7 @@ Blazor3DPhysics.sln
 │   ├── Models/                   # Domain entities and value objects
 │   │   ├── PhysicsTypes.cs      # Vector3, Quaternion, Materials, Presets
 │   │   └── SceneObjects.cs      # RigidBody, SoftBody, SimulationSettings
+│   │                            # RendererBackend, RendererInfo
 │   └── Common/                   # Shared domain types
 │       └── Result.cs            # Result pattern for functional error handling
 │
@@ -36,6 +37,7 @@ Blazor3DPhysics.sln
     │   └── Index.razor          # Main application page
     ├── Components/              # Reusable Blazor components
     │   ├── Viewport.razor       # 3D canvas host
+    │   ├── PerformanceOverlay.razor # FPS & renderer backend display
     │   ├── Toolbar.razor        # Control toolbar
     │   ├── Inspector.razor      # Property editor
     │   └── Stats.razor          # Performance statistics
@@ -47,6 +49,11 @@ Blazor3DPhysics.sln
     ├── Models/                  # Backwards compatibility aliases
     └── wwwroot/                 # Static assets and JavaScript
         └── js/                  # JavaScript interop modules
+            ├── rendering.webgpu.js  # WebGPU detection & metrics
+            ├── rendering.js         # Babylon.js (WebGPU/WebGL)
+            ├── physics.rigid.js     # Rapier rigid bodies
+            ├── physics.soft.js      # Ammo soft bodies
+            └── interop.js           # Blazor-JS bridge
 ```
 
 ### Dependency Flow
@@ -72,6 +79,76 @@ This codebase follows all five SOLID principles:
 | **L**iskov Substitution | All physics services implement `IPhysicsService` base interface |
 | **I**nterface Segregation | Soft body interfaces split: `IClothPhysicsService`, `IRopePhysicsService`, etc. |
 | **D**ependency Inversion | All components depend on abstractions (interfaces), not concrete implementations |
+
+## Rendering Architecture
+
+### WebGPU/WebGL Backend Selection
+
+The rendering system supports multiple backends with automatic selection:
+
+```mermaid
+flowchart TB
+    Start[Initialize Rendering] --> CheckPref{Preferred Backend?}
+    CheckPref -->|Auto| DetectGPU{WebGPU Available?}
+    CheckPref -->|WebGPU| TryGPU{Try WebGPU}
+    CheckPref -->|WebGL2| UseGL2[Use WebGL2]
+    CheckPref -->|WebGL| UseGL1[Use WebGL]
+    
+    DetectGPU -->|Yes| UseGPU[Use WebGPU]
+    DetectGPU -->|No| FallbackGL2[Fallback to WebGL2]
+    
+    TryGPU -->|Success| UseGPU
+    TryGPU -->|Fail| FallbackGL2
+    
+    FallbackGL2 --> CheckGL2{WebGL2 Available?}
+    CheckGL2 -->|Yes| UseGL2
+    CheckGL2 -->|No| UseGL1
+    
+    UseGPU --> Ready[Renderer Ready]
+    UseGL2 --> Ready
+    UseGL1 --> Ready
+```
+
+### Renderer Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| WebGPU Module | `rendering.webgpu.js` | Detection, capabilities, benchmarking |
+| Rendering Module | `rendering.js` | Babylon.js scene management |
+| Rendering Service | `RenderingService.cs` | C# wrapper for JS interop |
+| Performance Overlay | `PerformanceOverlay.razor` | UI for FPS & renderer info |
+
+### Renderer Information Flow
+
+```csharp
+// Get renderer info from JavaScript
+var rendererInfo = await RenderingService.GetRendererInfoAsync();
+
+// RendererInfo contains:
+// - Backend: "WebGPU", "WebGL2", or "WebGL"
+// - Vendor: GPU vendor name
+// - Renderer: GPU device name
+// - IsWebGPU: true if using WebGPU
+// - IsFallback: true if fell back from preferred backend
+// - FallbackReason: reason for fallback (if any)
+```
+
+### Performance Metrics
+
+The `WebGPUModule` tracks detailed performance metrics:
+
+```javascript
+// Frame time tracking
+WebGPUModule.recordFrameTime(frameTimeMs);
+
+// Get metrics
+var metrics = WebGPUModule.getPerformanceMetrics();
+// Returns: fps, frameTimeMs, percentile95, percentile99, minFrameTime, maxFrameTime
+
+// Run benchmark comparing backends
+var results = await WebGPUModule.runBenchmark(canvasId);
+// Returns: webgpu results, webgl2 results, recommendation
+```
 
 ## High-Level Architecture
 
@@ -103,6 +180,7 @@ flowchart TB
     end
 
     subgraph External["External (JavaScript)"]
+        WebGPU[WebGPU Module]
         Babylon[Babylon.js]
         Rapier[Rapier.js]
         Ammo[Ammo.js]
@@ -190,7 +268,8 @@ BlazorClient/
 │   ├── Viewport.razor           # Canvas host
 │   ├── Toolbar.razor            # Spawn controls, playback
 │   ├── Inspector.razor          # Property editing
-│   └── Stats.razor              # Performance display
+│   ├── Stats.razor              # Performance display
+│   └── PerformanceOverlay.razor  # FPS & renderer backend display
 ├── Services/                    # (Many will move to Infrastructure)
 │   ├── Interfaces/
 │   │   └── IPhysicsInterfaces.cs # Segregated physics interfaces (ISP)
@@ -216,10 +295,11 @@ BlazorClient/
 │   └── Result.cs                # Alias to Domain.Common
 └── wwwroot/
     └── js/
-        ├── rendering.js       # Babylon.js scene with registry pattern (OCP)
-        ├── physics.rigid.js   # Rapier world, bodies, colliders
-        ├── physics.soft.js    # Ammo soft body world
-        └── interop.js         # Bridge with dependency injection (DIP)
+        ├── rendering.webgpu.js  # WebGPU detection & metrics
+        ├── rendering.js         # Babylon.js (WebGPU/WebGL)
+        ├── physics.rigid.js     # Rapier rigid bodies
+        ├── physics.soft.js      # Ammo soft bodies
+        └── interop.js           # Blazor-JS bridge
 ```
 
 ## Backwards Compatibility

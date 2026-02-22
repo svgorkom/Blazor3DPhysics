@@ -21,7 +21,11 @@
         <PerformanceOverlay Fps="@Fps" 
                            PhysicsTimeMs="@PhysicsTimeMs" 
                            RigidBodyCount="@RigidBodyCount" 
-                           SoftBodyCount="@SoftBodyCount" />
+                           SoftBodyCount="@SoftBodyCount"
+                           ActiveBackend="@ActiveBackend"
+                           GpuInfo="@GpuInfo"
+                           IsFallbackRenderer="@IsFallbackRenderer"
+                           ShowRendererBadge="@ShowRendererBadge" />
     </div>
 </div>
 
@@ -67,6 +71,30 @@
     /// </summary>
     [Parameter]
     public int SoftBodyCount { get; set; }
+
+    /// <summary>
+    /// The active rendering backend (WebGPU, WebGL2, WebGL).
+    /// </summary>
+    [Parameter]
+    public string? ActiveBackend { get; set; }
+
+    /// <summary>
+    /// GPU information string (vendor/renderer).
+    /// </summary>
+    [Parameter]
+    public string? GpuInfo { get; set; }
+
+    /// <summary>
+    /// Whether the renderer is using a fallback backend.
+    /// </summary>
+    [Parameter]
+    public bool IsFallbackRenderer { get; set; }
+
+    /// <summary>
+    /// Whether to show the renderer badge in the performance overlay.
+    /// </summary>
+    [Parameter]
+    public bool ShowRendererBadge { get; set; } = true;
 
     private bool _isDragging;
 

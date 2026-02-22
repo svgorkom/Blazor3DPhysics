@@ -267,6 +267,132 @@ public class SceneObjectsTests
         Assert.That(settings.ShowDebugOverlay, Is.False);
     }
 
+    /// <summary>
+    /// Verifies that RenderSettings has correct default WebGPU-related values.
+    /// </summary>
+    [Test]
+    public void RenderSettings_DefaultValues_WebGPU_ShouldBeCorrect()
+    {
+        // Act
+        var settings = new RenderSettings();
+
+        // Assert
+        Assert.That(settings.PreferredBackend, Is.EqualTo(RendererBackend.Auto));
+        Assert.That(settings.ShowRendererInfo, Is.True);
+    }
+
+    /// <summary>
+    /// Verifies that RenderSettings PreferredBackend can be set to all valid values.
+    /// </summary>
+    [Test]
+    [TestCase(RendererBackend.Auto)]
+    [TestCase(RendererBackend.WebGPU)]
+    [TestCase(RendererBackend.WebGL2)]
+    [TestCase(RendererBackend.WebGL)]
+    public void RenderSettings_PreferredBackend_CanBeSetToAllValues(RendererBackend backend)
+    {
+        // Arrange
+        var settings = new RenderSettings();
+
+        // Act
+        settings.PreferredBackend = backend;
+
+        // Assert
+        Assert.That(settings.PreferredBackend, Is.EqualTo(backend));
+    }
+
+    #endregion
+
+    #region RendererBackend Enum Tests
+
+    /// <summary>
+    /// Verifies that RendererBackend enum has expected values.
+    /// </summary>
+    [Test]
+    public void RendererBackend_Enum_ShouldHaveExpectedValues()
+    {
+        // Assert
+        Assert.That(Enum.GetValues<RendererBackend>(), Has.Length.EqualTo(4));
+        Assert.That(Enum.IsDefined(typeof(RendererBackend), "Auto"), Is.True);
+        Assert.That(Enum.IsDefined(typeof(RendererBackend), "WebGPU"), Is.True);
+        Assert.That(Enum.IsDefined(typeof(RendererBackend), "WebGL2"), Is.True);
+        Assert.That(Enum.IsDefined(typeof(RendererBackend), "WebGL"), Is.True);
+    }
+
+    #endregion
+
+    #region RendererInfo Tests
+
+    /// <summary>
+    /// Verifies that RendererInfo has correct default values.
+    /// </summary>
+    [Test]
+    public void RendererInfo_DefaultValues_ShouldBeCorrect()
+    {
+        // Act
+        var info = new RendererInfo();
+
+        // Assert
+        Assert.That(info.Backend, Is.EqualTo("Unknown"));
+        Assert.That(info.Vendor, Is.Null);
+        Assert.That(info.Renderer, Is.Null);
+        Assert.That(info.Version, Is.Null);
+        Assert.That(info.IsWebGPU, Is.False);
+        Assert.That(info.IsFallback, Is.False);
+        Assert.That(info.FallbackReason, Is.Null);
+    }
+
+    /// <summary>
+    /// Verifies that RendererInfo can be populated with WebGPU values.
+    /// </summary>
+    [Test]
+    public void RendererInfo_WebGPU_CanBePopulated()
+    {
+        // Arrange & Act
+        var info = new RendererInfo
+        {
+            Backend = "WebGPU",
+            Vendor = "NVIDIA",
+            Renderer = "GeForce RTX 4090",
+            Version = "1.0",
+            IsWebGPU = true,
+            IsFallback = false,
+            FallbackReason = null
+        };
+
+        // Assert
+        Assert.That(info.Backend, Is.EqualTo("WebGPU"));
+        Assert.That(info.Vendor, Is.EqualTo("NVIDIA"));
+        Assert.That(info.Renderer, Is.EqualTo("GeForce RTX 4090"));
+        Assert.That(info.IsWebGPU, Is.True);
+        Assert.That(info.IsFallback, Is.False);
+    }
+
+    /// <summary>
+    /// Verifies that RendererInfo can be populated with fallback values.
+    /// </summary>
+    [Test]
+    public void RendererInfo_Fallback_CanBePopulated()
+    {
+        // Arrange & Act
+        var info = new RendererInfo
+        {
+            Backend = "WebGL2",
+            Vendor = "Google Inc.",
+            Renderer = "ANGLE",
+            Version = "WebGL 2.0",
+            IsWebGPU = false,
+            IsFallback = true,
+            FallbackReason = "WebGPU not available"
+        };
+
+        // Assert
+        Assert.That(info.Backend, Is.EqualTo("WebGL2"));
+        Assert.That(info.IsWebGPU, Is.False);
+        Assert.That(info.IsFallback, Is.True);
+        Assert.That(info.FallbackReason, Is.EqualTo("WebGPU not available"));
+    }
+
     #endregion
 
     #region PerformanceStats Tests
@@ -290,6 +416,21 @@ public class SceneObjectsTests
         Assert.That(stats.TotalVertices, Is.EqualTo(0));
         Assert.That(stats.TotalTriangles, Is.EqualTo(0));
         Assert.That(stats.UsedMemoryMB, Is.EqualTo(0));
+    }
+
+    /// <summary>
+    /// Verifies that PerformanceStats has correct default WebGPU-related values.
+    /// </summary>
+    [Test]
+    public void PerformanceStats_DefaultValues_WebGPU_ShouldBeCorrect()
+    {
+        // Act
+        var stats = new PerformanceStats();
+
+        // Assert
+        Assert.That(stats.ActiveBackend, Is.EqualTo("Unknown"));
+        Assert.That(stats.FrameTime95thPercentile, Is.EqualTo(0f));
+        Assert.That(stats.FrameTime99thPercentile, Is.EqualTo(0f));
     }
 
     #endregion

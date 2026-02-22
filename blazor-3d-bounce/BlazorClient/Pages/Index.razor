@@ -100,7 +100,11 @@
           Fps="@SimulationLoop.Fps"
           PhysicsTimeMs="@SimulationLoop.PhysicsTimeMs"
           RigidBodyCount="@SceneState.RigidBodies.Count"
-          SoftBodyCount="@SceneState.SoftBodies.Count" />
+          SoftBodyCount="@SceneState.SoftBodies.Count"
+          ActiveBackend="@_activeBackend"
+          GpuInfo="@_gpuInfo"
+          IsFallbackRenderer="@_isFallbackRenderer"
+          ShowRendererBadge="@SceneState.RenderSettings.ShowRendererInfo" />
 
 <Inspector SelectedRigidBody="@SceneState.SelectedRigidBody"
            SelectedSoftBody="@SceneState.SelectedSoftBody"
@@ -123,6 +127,11 @@
     private bool _softBodyAvailable;
     private Action? _sceneStateChangedHandler;
     private Action? _simulationStateChangedHandler;
+    
+    // Renderer info
+    private string _activeBackend = "Unknown";
+    private string? _gpuInfo;
+    private bool _isFallbackRenderer;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -145,6 +154,9 @@
             // Initialize rendering
             await RenderingService.InitializeAsync("renderCanvas", SceneState.RenderSettings);
             Console.WriteLine("Rendering initialized");
+            
+            // Get renderer info
+            await UpdateRendererInfoAsync();
 
             // Initialize rigid physics
             await RigidPhysics.InitializeAsync(SceneState.Settings);
@@ -169,12 +181,34 @@
             await SimulationLoop.StartAsync();
 
             Console.WriteLine("Initialization complete");
+            Console.WriteLine($"Active renderer backend: {_activeBackend}");
             StateHasChanged();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Initialization error: {ex.Message}");
             Console.Error.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    private async Task UpdateRendererInfoAsync()
+    {
+        try
+        {
+            var rendererInfo = await RenderingService.GetRendererInfoAsync();
+            _activeBackend = rendererInfo.Backend;
+            _gpuInfo = rendererInfo.Renderer ?? rendererInfo.Vendor;
+            _isFallbackRenderer = rendererInfo.IsFallback;
+            
+            if (rendererInfo.IsFallback && !string.IsNullOrEmpty(rendererInfo.FallbackReason))
+            {
+                Console.WriteLine($"Using fallback renderer: {rendererInfo.FallbackReason}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to get renderer info: {ex.Message}");
+            _activeBackend = "Unknown";
         }
     }
 

@@ -5,6 +5,7 @@
 ![Babylon.js](https://img.shields.io/badge/Babylon.js-Latest-orange)
 ![Rapier](https://img.shields.io/badge/Rapier.js-0.12-green)
 ![Ammo.js](https://img.shields.io/badge/Ammo.js-SoftBody-yellow)
+![WebGPU](https://img.shields.io/badge/WebGPU-Ready-blueviolet)
 
 A production-quality .NET 8 Blazor WebAssembly application featuring realistic 3D physics simulation with both **rigid bodies** (bouncing meshes with restitution/friction) and **soft bodies** (cloth, rope, and volumetric "jelly" objects).
 
@@ -27,17 +28,19 @@ A production-quality .NET 8 Blazor WebAssembly application featuring realistic 3
 - ⚙️ Configurable stiffness, damping, and iterations
 
 ### Rendering (Babylon.js)
+- 🚀 **WebGPU Support**: Automatic detection with fallback to WebGL2
 - 🎨 PBR materials with metallic/roughness workflow
 - 🌅 HDR environment lighting and IBL
 - 🔦 Real-time shadow mapping
 - 📐 Grid and axis helpers
 - 🔍 Object selection highlighting
 - 🕸️ Wireframe visualization mode
+- 📊 Performance metrics with renderer backend display
 
 ### User Interface
 - 🛠️ Intuitive toolbar with spawn controls
 - 📋 Inspector panel for object properties
-- 📊 Real-time performance statistics (FPS, physics time)
+- 📊 Real-time performance statistics (FPS, physics time, active renderer)
 - 🌙 Dark theme with responsive design
 - ⌨️ Keyboard accessible
 
@@ -45,7 +48,8 @@ A production-quality .NET 8 Blazor WebAssembly application featuring realistic 3
 
 ### Prerequisites
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- Modern web browser (Chrome, Edge, Firefox) with WebGL2 support
+- Modern web browser with WebGL2 support (Chrome, Edge, Firefox)
+- **For WebGPU**: Chrome 113+, Edge 113+, or Firefox Nightly with WebGPU enabled
 
 ### Run the Application
 
@@ -93,7 +97,7 @@ blazor-3d-bounce/
 ├── BlazorClient.Domain/         # Domain Layer (no dependencies)
 │   ├── Models/                  # Domain entities
 │   │   ├── PhysicsTypes.cs     # Vector3, materials, presets
-│   │   └── SceneObjects.cs     # RigidBody, SoftBody, settings
+│   │   └── SceneObjects.cs     # RigidBody, SoftBody, settings, RendererInfo
 │   └── Common/
 │       └── Result.cs           # Functional error handling
 ├── BlazorClient.Application/    # Application Layer
@@ -109,13 +113,15 @@ blazor-3d-bounce/
 │   │   ├── index.html          # HTML host
 │   │   ├── css/site.css        # Styles
 │   │   ├── js/
-│   │   │   ├── rendering.js    # Babylon.js rendering
+│   │   │   ├── rendering.webgpu.js # WebGPU detection & metrics
+│   │   │   ├── rendering.js    # Babylon.js rendering (WebGPU/WebGL)
 │   │   │   ├── physics.rigid.js # Rapier.js rigid bodies
 │   │   │   ├── physics.soft.js  # Ammo.js soft bodies
 │   │   │   └── interop.js      # Blazor-JS bridge
 │   │   └── assets/             # HDRI, models
 │   ├── Components/
 │   │   ├── Viewport.razor      # 3D canvas
+│   │   ├── PerformanceOverlay.razor # FPS & renderer info
 │   │   ├── Inspector.razor     # Property editor
 │   │   ├── Toolbar.razor       # Top toolbar
 │   │   └── Stats.razor         # Performance display
@@ -123,7 +129,7 @@ blazor-3d-bounce/
 │   │   ├── Commands/           # Command handlers
 │   │   ├── Interfaces/         # Service interfaces
 │   │   ├── Factories/          # Factory patterns
-│   │   ├── RenderingService.cs # Babylon.js wrapper
+│   │   ├── RenderingService.cs # Babylon.js wrapper (WebGPU/WebGL)
 │   │   ├── PhysicsService.Rigid.cs # Rapier wrapper
 │   │   ├── PhysicsService.Soft.cs  # Ammo wrapper
 │   │   └── ...
@@ -172,6 +178,12 @@ Volumetric soft body dropped on ground, showing pressure-based volume preservati
 
 ## ⚙️ Configuration
 
+### Renderer Settings
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Preferred Backend | Auto | Auto, WebGPU, WebGL2, or WebGL |
+| Show Renderer Info | true | Display active renderer in performance overlay |
+
 ### Physics Settings
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -207,8 +219,15 @@ Energy retained per bounce: `E_n / E_0 ≈ e²`
 - ~200 dynamic rigid bodies
 - ~2500 soft body vertices (single cloth)
 - Batched interop for minimal per-frame overhead
+- **WebGPU**: Up to 20% performance improvement on supported browsers
 
 ## 🛠️ Troubleshooting
+
+### WebGPU Not Available
+WebGPU requires:
+- Chrome 113+ or Edge 113+ with WebGPU enabled
+- Firefox Nightly with `dom.webgpu.enabled` set to `true`
+- The application will automatically fall back to WebGL2
 
 ### WebGL Not Available
 Ensure your browser supports WebGL2. Check at [get.webgl.org](https://get.webgl.org/).
@@ -217,14 +236,19 @@ Ensure your browser supports WebGL2. Check at [get.webgl.org](https://get.webgl.
 Ammo.js WASM may fail to load on some systems. The app will fall back to rigid-only mode with a warning indicator.
 
 ### Poor Performance
+- Check which renderer is active (shown in performance overlay)
 - Reduce shadow map size
 - Disable SSAO
 - Lower soft body resolution
 - Reduce substep count
+- Try forcing WebGPU (if available) for better performance
 
 ## 📚 Documentation
 
-- [Architecture Overview](docs/architecture.md)
+- [Understanding Blazor](docs/understanding-blazor.md) - Complete guide to Blazor (beginner to advanced)
+- [How It Works](docs/how-it-works-explained.md) - Non-technical explanation of the application
+- [Architecture Overview](docs/architecture.md) - System design and Clean Architecture details
+- [Developer Quick Reference](docs/DEVELOPER_QUICK_REFERENCE.md) - Quick reference for developers
 - [Rigid Body Physics](docs/physics.md)
 - [Soft Body Physics](docs/softbody.md)
 - [User Guide](docs/usage.md)
@@ -245,6 +269,12 @@ Ammo.js WASM may fail to load on some systems. The app will fall back to rigid-o
 - [ ] Jelly compresses and preserves volume
 - [ ] Pinned vertices remain fixed
 
+### Rendering Tests
+- [ ] WebGPU detected on supported browsers
+- [ ] Automatic fallback to WebGL2 works
+- [ ] Performance overlay shows active renderer
+- [ ] Renderer badge displays correctly (WebGPU/WebGL2/WebGL)
+
 ### Performance
 - [ ] 60 FPS with 10 rigid bodies
 - [ ] Responsive UI during simulation
@@ -256,7 +286,7 @@ MIT License - See LICENSE file for details.
 
 ## 🙏 Acknowledgments
 
-- [Babylon.js](https://www.babylonjs.com/) - 3D rendering engine
+- [Babylon.js](https://www.babylonjs.com/) - 3D rendering engine (WebGPU & WebGL)
 - [Rapier](https://rapier.rs/) - Rust/WASM rigid body physics
 - [Ammo.js](https://github.com/kripken/ammo.js/) - Bullet physics for JavaScript
 - [.NET Blazor](https://dotnet.microsoft.com/apps/aspnet/web-apps/blazor) - WebAssembly framework

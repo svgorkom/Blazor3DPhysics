@@ -4,7 +4,7 @@ Quick reference for using the new features added in the improvement phase.
 
 ---
 
-## ??? Rate Limiting
+## 🛡️ Rate Limiting
 
 ### Check if an operation is allowed:
 ```csharp
@@ -33,7 +33,7 @@ var options = new RateLimiterOptions
 
 ---
 
-## ? Validation
+## ✅ Validation
 
 ### Validate before creation:
 ```csharp
@@ -73,7 +73,7 @@ ValidationResult ValidateMassRatio(float mass1, float mass2);
 
 ---
 
-## ?? Performance Monitoring
+## 📊 Performance Monitoring
 
 ### Get current metrics:
 ```csharp
@@ -111,7 +111,7 @@ options.FpsWarningThreshold = 25f; // Lower warning threshold
 
 ---
 
-## ?? Command Logging
+## 📝 Command Logging
 
 ### Get execution history:
 ```csharp
@@ -157,7 +157,7 @@ loggingDispatcher.ClearHistory();
 
 ---
 
-## ?? Adding New Command Handlers
+## ➕ Adding New Command Handlers
 
 ### 1. Define the command:
 ```csharp
@@ -230,11 +230,11 @@ else
 
 ---
 
-## ?? Memory Management Best Practices
+## 🧹 Memory Management Best Practices
 
 ### Event Subscriptions:
 ```csharp
-// ? GOOD - Store reference
+// ✅ GOOD - Store reference
 private Action? _handler;
 
 protected override void OnInitialized()
@@ -252,7 +252,7 @@ public void Dispose()
     }
 }
 
-// ? BAD - No cleanup
+// ❌ BAD - No cleanup
 protected override void OnInitialized()
 {
     _service.OnEvent += HandleEvent; // LEAK!
@@ -280,7 +280,7 @@ public class MyComponent : IAsyncDisposable
 
 ---
 
-## ?? Configuration Cheat Sheet
+## ⚙️ Configuration Cheat Sheet
 
 ### Performance Monitor:
 ```csharp
@@ -315,7 +315,7 @@ new RateLimiterOptions
 
 ---
 
-## ?? Debugging Tips
+## 🔍 Debugging Tips
 
 ### Enable detailed logging:
 ```csharp
@@ -357,7 +357,7 @@ if (snapshot.MemoryUsedBytes > 500 * 1024 * 1024) // 500MB
 
 ---
 
-## ?? Further Reading
+## 📖 Further Reading
 
 - **SOLID Principles**: All services follow SOLID design
 - **Command Pattern**: See `Services/Commands/`
@@ -367,7 +367,7 @@ if (snapshot.MemoryUsedBytes > 500 * 1024 * 1024) // 500MB
 
 ---
 
-## ?? Common Patterns
+## 🔄 Common Patterns
 
 ### Result Pattern:
 ```csharp

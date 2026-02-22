@@ -1,6 +1,32 @@
 ﻿namespace BlazorClient.Domain.Models;
 
 /// <summary>
+/// Available rendering backends.
+/// </summary>
+public enum RendererBackend
+{
+    /// <summary>
+    /// Automatically select the best available backend (WebGPU if available, then WebGL2).
+    /// </summary>
+    Auto,
+    
+    /// <summary>
+    /// WebGPU rendering (modern, high-performance).
+    /// </summary>
+    WebGPU,
+    
+    /// <summary>
+    /// WebGL 2.0 rendering (widely supported).
+    /// </summary>
+    WebGL2,
+    
+    /// <summary>
+    /// WebGL 1.0 rendering (legacy fallback).
+    /// </summary>
+    WebGL
+}
+
+/// <summary>
 /// Base class for all scene objects (rigid and soft bodies).
 /// </summary>
 public abstract class SceneObject
@@ -117,6 +143,11 @@ public class SimulationSettings
 /// </summary>
 public class RenderSettings
 {
+    /// <summary>
+    /// Preferred rendering backend. Auto will select WebGPU if available, then WebGL2.
+    /// </summary>
+    public RendererBackend PreferredBackend { get; set; } = RendererBackend.Auto;
+    
     public bool EnableShadows { get; set; } = true;
     public int ShadowMapSize { get; set; } = 2048;
     public bool EnableSSAO { get; set; } = false;
@@ -127,6 +158,52 @@ public class RenderSettings
     public bool ShowBoundingBoxes { get; set; } = false;
     public bool ShowDebugOverlay { get; set; } = false;
     public string? HdriPath { get; set; } = "assets/environment.hdr";
+    
+    /// <summary>
+    /// Show the active renderer backend in the performance overlay.
+    /// </summary>
+    public bool ShowRendererInfo { get; set; } = true;
+}
+
+/// <summary>
+/// Information about the active rendering backend.
+/// </summary>
+public class RendererInfo
+{
+    /// <summary>
+    /// The active rendering backend (WebGPU, WebGL2, WebGL).
+    /// </summary>
+    public string Backend { get; set; } = "Unknown";
+    
+    /// <summary>
+    /// GPU vendor name.
+    /// </summary>
+    public string? Vendor { get; set; }
+    
+    /// <summary>
+    /// GPU renderer name.
+    /// </summary>
+    public string? Renderer { get; set; }
+    
+    /// <summary>
+    /// Backend version string.
+    /// </summary>
+    public string? Version { get; set; }
+    
+    /// <summary>
+    /// True if using WebGPU backend.
+    /// </summary>
+    public bool IsWebGPU { get; set; }
+    
+    /// <summary>
+    /// True if fell back from preferred backend.
+    /// </summary>
+    public bool IsFallback { get; set; }
+    
+    /// <summary>
+    /// Reason for fallback, if applicable.
+    /// </summary>
+    public string? FallbackReason { get; set; }
 }
 
 /// <summary>
@@ -143,6 +220,21 @@ public class PerformanceStats
     public int TotalVertices { get; set; }
     public int TotalTriangles { get; set; }
     public long UsedMemoryMB { get; set; }
+    
+    /// <summary>
+    /// Active rendering backend name.
+    /// </summary>
+    public string ActiveBackend { get; set; } = "Unknown";
+    
+    /// <summary>
+    /// 95th percentile frame time (ms).
+    /// </summary>
+    public float FrameTime95thPercentile { get; set; }
+    
+    /// <summary>
+    /// 99th percentile frame time (ms).
+    /// </summary>
+    public float FrameTime99thPercentile { get; set; }
 }
 
 /// <summary>
