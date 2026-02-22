@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace BlazorClient.Domain.Models;
 
@@ -92,7 +92,6 @@ public enum RigidPrimitiveType
 public enum SoftBodyType
 {
     Cloth,
-    Rope,
     Volumetric
 }
 
@@ -102,7 +101,6 @@ public enum SoftBodyType
 public enum SoftBodyPreset
 {
     DrapedCloth,
-    RopePendulum,
     JellyCube,
     FlagOnPole,
     ClothStack,
@@ -197,18 +195,6 @@ public class SoftBodyMaterial
         ConstraintIterations = 10
     };
 
-    public static SoftBodyMaterial Rope => new()
-    {
-        Name = "Rope",
-        MassDensity = 0.3f,
-        StructuralStiffness = 0.95f,
-        ShearStiffness = 0f,
-        BendingStiffness = 0.1f,
-        Damping = 0.1f,
-        SelfCollision = false,
-        ConstraintIterations = 15
-    };
-
     public static SoftBodyMaterial Jelly => new()
     {
         Name = "Jelly",
@@ -226,7 +212,6 @@ public class SoftBodyMaterial
     public static SoftBodyMaterial FromPreset(SoftBodyPreset preset) => preset switch
     {
         SoftBodyPreset.DrapedCloth or SoftBodyPreset.FlagOnPole or SoftBodyPreset.ClothStack => Cloth,
-        SoftBodyPreset.RopePendulum => Rope,
         SoftBodyPreset.JellyCube => Jelly,
         _ => new SoftBodyMaterial()
     };

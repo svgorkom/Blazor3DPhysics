@@ -1,4 +1,4 @@
-using BlazorClient.Models;
+﻿using BlazorClient.Models;
 using Microsoft.JSInterop;
 
 namespace BlazorClient.Services;
@@ -7,7 +7,7 @@ namespace BlazorClient.Services;
 /// Interface for soft body physics.
 /// Extends IPhysicsService and segregated interfaces for full SOLID compliance.
 /// </summary>
-public interface ISoftPhysicsService : IPhysicsService, IClothPhysicsService, IRopePhysicsService, 
+public interface ISoftPhysicsService : IPhysicsService, IClothPhysicsService, 
     IVolumetricPhysicsService, IVertexPinningService, ISoftBodyVertexDataService
 {
     /// <summary>
@@ -126,27 +126,6 @@ public class SoftPhysicsService : ISoftPhysicsService, IAsyncDisposable
         };
 
         await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.createCloth", clothData);
-    }
-
-    /// <inheritdoc />
-    public async Task CreateRopeAsync(SoftBody body)
-    {
-        if (!IsAvailable) return;
-
-        var ropeData = new
-        {
-            id = body.Id,
-            position = body.Transform.Position.ToArray(),
-            length = body.Length,
-            segments = Math.Min(body.Segments, 25),
-            structuralStiffness = body.Material.StructuralStiffness,
-            bendingStiffness = body.Material.BendingStiffness,
-            damping = body.Material.Damping,
-            iterations = Math.Min(body.Material.ConstraintIterations, 8),
-            pinnedVertices = body.PinnedVertices.ToArray()
-        };
-
-        await _jsRuntime.InvokeVoidAsync("SoftPhysicsModule.createRope", ropeData);
     }
 
     /// <inheritdoc />

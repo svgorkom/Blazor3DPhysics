@@ -1,6 +1,6 @@
 /**
  * Soft Body Physics Module (Highly Optimized)
- * Provides cloth, rope, and volumetric soft body simulation
+ * Provides cloth and volumetric soft body simulation
  * Uses Position Based Dynamics aligned with rigid body simulation
  * 
  * Performance optimizations:
@@ -152,53 +152,6 @@
                     cI1[c] = idx; cI2[c] = idx + stride * 2; cRest[c] = stepY * 2; cStiff[c++] = bStiff;
                 }
             }
-        }
-        body.cCount = c;
-        return body;
-    }
-
-    /**
-     * Create rope - simple linear chain
-     */
-    function createRopeBody(data) {
-        const pos = data.position || [0, 0, 0];
-        const length = data.length || 5.0;
-        const segments = Math.min(data.segments || 15, 25);
-        const pinnedSet = new Set(data.pinnedVertices || []);
-
-        const vertexCount = segments + 1;
-        const constraintCount = segments + Math.max(0, segments - 1);
-        
-        const body = createBody('rope', vertexCount, constraintCount, 0, 0);
-        body.damping = data.damping || 0.02;
-        body.iterations = Math.min(data.iterations || 6, 8);
-        body.segments = segments;
-
-        const segLen = length / segments;
-        const sStiff = data.structuralStiffness || 0.95;
-        const bStiff = data.bendingStiffness || 0.4;
-
-        const positions = body.positions;
-        const velocities = body.velocities;
-        const inverseMasses = body.inverseMasses;
-
-        for (let i = 0; i <= segments; i++) {
-            const i3 = i * 3;
-            positions[i3] = pos[0];
-            positions[i3 + 1] = pos[1] - i * segLen;
-            positions[i3 + 2] = pos[2];
-            velocities[i3] = velocities[i3 + 1] = velocities[i3 + 2] = 0;
-            inverseMasses[i] = pinnedSet.has(i) ? 0 : 1.0;
-        }
-
-        const cI1 = body.cI1, cI2 = body.cI2, cRest = body.cRest, cStiff = body.cStiff;
-        let c = 0;
-
-        for (let i = 0; i < segments; i++) {
-            cI1[c] = i; cI2[c] = i + 1; cRest[c] = segLen; cStiff[c++] = sStiff;
-        }
-        for (let i = 0; i < segments - 1; i++) {
-            cI1[c] = i; cI2[c] = i + 2; cRest[c] = segLen * 2; cStiff[c++] = bStiff;
         }
         body.cCount = c;
         return body;
@@ -436,18 +389,6 @@
             bodyCount = bodyIds.length;
         },
 
-        createRope: function(data) {
-            if (!_isAvailable || !data || !data.id) return;
-            const body = createRopeBody(data);
-            softBodies[data.id] = body;
-            initialStates[data.id] = {
-                pos: new Float32Array(body.positions),
-                vel: new Float32Array(body.velocities)
-            };
-            bodyIds = Object.keys(softBodies);
-            bodyCount = bodyIds.length;
-        },
-
         createVolumetric: function(data) {
             if (!_isAvailable || !data || !data.id) return;
             const body = createVolumetricBody(data);
@@ -532,7 +473,7 @@
 
         // Legacy compatibility - with Array conversion
         getAllDeformedVertices: function() {
-            if (bodyCount === 0) return {};
+            if bodyCount === 0) return {};
             const result = {};
             for (let i = 0; i < bodyCount; i++) {
                 const id = bodyIds[i];

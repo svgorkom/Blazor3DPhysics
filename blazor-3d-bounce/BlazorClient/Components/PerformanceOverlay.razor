@@ -1,0 +1,111 @@
+@namespace BlazorClient.Components
+
+<div class="performance-overlay @(IsExpanded ? "expanded" : "collapsed")" @onclick="ToggleExpanded">
+    <div class="perf-header">
+        <span class="perf-fps @GetFpsClass()">@Fps.ToString("F0") FPS</span>
+        <i class="bi @(IsExpanded ? "bi-chevron-up" : "bi-chevron-down") perf-toggle"></i>
+    </div>
+    
+    @if (IsExpanded)
+    {
+        <div class="perf-details">
+            <div class="perf-row">
+                <span class="perf-label">Physics</span>
+                <span class="perf-value @GetPhysicsClass()">@PhysicsTimeMs.ToString("F2") ms</span>
+            </div>
+            
+            <div class="perf-row">
+                <span class="perf-label">Frame Time</span>
+                <span class="perf-value">@FrameTimeMs.ToString("F2") ms</span>
+            </div>
+            
+            <div class="perf-divider"></div>
+            
+            <div class="perf-row">
+                <span class="perf-label">Rigid Bodies</span>
+                <span class="perf-value">@RigidBodyCount</span>
+            </div>
+            
+            <div class="perf-row">
+                <span class="perf-label">Soft Bodies</span>
+                <span class="perf-value">@SoftBodyCount</span>
+            </div>
+            
+            <div class="perf-row">
+                <span class="perf-label">Total Objects</span>
+                <span class="perf-value">@(RigidBodyCount + SoftBodyCount)</span>
+            </div>
+            
+            <div class="perf-divider"></div>
+            
+            <div class="perf-row">
+                <span class="perf-label">Physics Budget</span>
+                <div class="perf-bar">
+                    <div class="perf-bar-fill @GetPhysicsBudgetClass()" style="width: @GetPhysicsBudgetPercent()%"></div>
+                </div>
+            </div>
+            
+            <div class="perf-row">
+                <span class="perf-label">Frame Budget</span>
+                <div class="perf-bar">
+                    <div class="perf-bar-fill @GetFrameBudgetClass()" style="width: @GetFrameBudgetPercent()%"></div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public float Fps { get; set; }
+
+    [Parameter]
+    public float PhysicsTimeMs { get; set; }
+
+    [Parameter]
+    public int RigidBodyCount { get; set; }
+
+    [Parameter]
+    public int SoftBodyCount { get; set; }
+
+    private bool IsExpanded { get; set; } = false;
+
+    // Target 60 FPS = ~16.67ms per frame
+    private float FrameTimeMs => Fps > 0 ? 1000f / Fps : 0;
+
+    private void ToggleExpanded() => IsExpanded = !IsExpanded;
+
+    private string GetFpsClass() => Fps switch
+    {
+        >= 55 => "good",
+        >= 30 => "warning",
+        _ => "danger"
+    };
+
+    private string GetPhysicsClass() => PhysicsTimeMs switch
+    {
+        <= 4 => "good",
+        <= 8 => "warning",
+        _ => "danger"
+    };
+
+    // Physics should take no more than ~8ms of the 16.67ms budget
+    private float GetPhysicsBudgetPercent() => Math.Min(100, (PhysicsTimeMs / 8f) * 100);
+
+    private string GetPhysicsBudgetClass() => GetPhysicsBudgetPercent() switch
+    {
+        <= 50 => "good",
+        <= 80 => "warning",
+        _ => "danger"
+    };
+
+    // Frame time budget at 60 FPS = 16.67ms
+    private float GetFrameBudgetPercent() => Math.Min(100, (FrameTimeMs / 16.67f) * 100);
+
+    private string GetFrameBudgetClass() => GetFrameBudgetPercent() switch
+    {
+        <= 80 => "good",
+        <= 100 => "warning",
+        _ => "danger"
+    };
+}

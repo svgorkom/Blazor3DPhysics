@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Components.Web;
+﻿using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using BlazorClient;
 using BlazorClient.Services;
@@ -42,7 +42,6 @@ builder.Services.AddSingleton<IMaterialCreatorFactory, MaterialCreatorFactory>()
 #region Segregated Interfaces (ISP - clients depend only on needed interfaces)
 
 builder.Services.AddScoped<IClothPhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
-builder.Services.AddScoped<IRopePhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
 builder.Services.AddScoped<IVolumetricPhysicsService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
 builder.Services.AddScoped<IVertexPinningService>(sp => sp.GetRequiredService<ISoftPhysicsService>());
 builder.Services.AddScoped<ISoftBodyVertexDataService>(sp => sp.GetRequiredService<ISoftPhysicsService>());

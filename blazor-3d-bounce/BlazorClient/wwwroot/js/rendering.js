@@ -127,28 +127,6 @@
             return mesh;
         },
         
-        rope: function(id, scene, data) {
-            const length = data.length || 5;
-            const segments = data.segments || 20;
-            const segmentLength = length / segments;
-            
-            // Create initial path for rope
-            const path = [];
-            for (let i = 0; i <= segments; i++) {
-                path.push(new BABYLON.Vector3(0, -i * segmentLength, 0));
-            }
-            
-            const mesh = BABYLON.MeshBuilder.CreateTube(id, {
-                path: path,
-                radius: data.radius || 0.02,
-                tessellation: 8,
-                updatable: true,
-                sideOrientation: BABYLON.Mesh.DOUBLESIDE
-            }, scene);
-            
-            return mesh;
-        },
-        
         volumetric: function(id, scene, data) {
             const radius = data.radius || 0.5;
             
@@ -174,14 +152,6 @@
             material.roughness = 0.8;
             material.backFaceCulling = false;
             material.twoSidedLighting = true;
-            return material;
-        },
-        
-        rope: function(id, scene, data) {
-            const material = new BABYLON.PBRMaterial(id + "_mat", scene);
-            material.albedoColor = new BABYLON.Color3(0.6, 0.4, 0.2);
-            material.metallic = 0.0;
-            material.roughness = 0.9;
             return material;
         },
         
@@ -574,8 +544,6 @@
                 // For cloth, we need to handle the vertex mapping
                 if (meshData.type === 'cloth') {
                     this._updateClothVertices(mesh, vertices, normals);
-                } else if (meshData.type === 'rope') {
-                    this._updateRopeVertices(mesh, vertices, meshData.originalData);
                 } else if (meshData.type === 'volumetric') {
                     this._updateVolumetricVertices(mesh, vertices, normals);
                 } else {
@@ -634,33 +602,6 @@
                 const computedNormals = [];
                 BABYLON.VertexData.ComputeNormals(positions, indices, computedNormals);
                 mesh.updateVerticesData(BABYLON.VertexBuffer.NormalKind, new Float32Array(computedNormals));
-            }
-        },
-
-        /**
-         * Update rope mesh by rebuilding the tube path
-         */
-        _updateRopeVertices: function(mesh, vertices, originalData) {
-            // Rope needs to be rebuilt with new path
-            const vertexCount = vertices.length / 3;
-            const path = [];
-
-            for (let i = 0; i < vertexCount; i++) {
-                path.push(new BABYLON.Vector3(
-                    vertices[i * 3],
-                    vertices[i * 3 + 1],
-                    vertices[i * 3 + 2]
-                ));
-            }
-
-            // Update tube with new path
-            if (path.length >= 2) {
-                mesh = BABYLON.MeshBuilder.CreateTube(null, {
-                    path: path,
-                    radius: originalData.radius || 0.02,
-                    tessellation: 8,
-                    instance: mesh
-                });
             }
         },
 

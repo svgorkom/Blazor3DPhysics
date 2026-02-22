@@ -16,6 +16,13 @@
             </div>
         }
     </div>
+    
+    <div class="viewport-perf-overlay" style="position: absolute; top: 16px; right: 16px; z-index: 9999; pointer-events: auto;">
+        <PerformanceOverlay Fps="@Fps" 
+                           PhysicsTimeMs="@PhysicsTimeMs" 
+                           RigidBodyCount="@RigidBodyCount" 
+                           SoftBodyCount="@SoftBodyCount" />
+    </div>
 </div>
 
 @code {
@@ -36,6 +43,30 @@
     /// </summary>
     [Parameter]
     public EventCallback<string> OnModelDropped { get; set; }
+
+    /// <summary>
+    /// Current frames per second.
+    /// </summary>
+    [Parameter]
+    public float Fps { get; set; }
+
+    /// <summary>
+    /// Time spent in physics calculations (ms).
+    /// </summary>
+    [Parameter]
+    public float PhysicsTimeMs { get; set; }
+
+    /// <summary>
+    /// Number of rigid bodies in the scene.
+    /// </summary>
+    [Parameter]
+    public int RigidBodyCount { get; set; }
+
+    /// <summary>
+    /// Number of soft bodies in the scene.
+    /// </summary>
+    [Parameter]
+    public int SoftBodyCount { get; set; }
 
     private bool _isDragging;
 

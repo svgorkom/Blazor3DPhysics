@@ -329,21 +329,6 @@ public class PhysicsTypesTests
     }
 
     /// <summary>
-    /// Verifies that SoftBodyMaterial.Rope preset has correct rope simulation properties.
-    /// </summary>
-    [Test]
-    public void SoftBodyMaterial_Rope_ShouldHaveCorrectValues()
-    {
-        // Act
-        var rope = SoftBodyMaterial.Rope;
-
-        // Assert
-        Assert.That(rope.Name, Is.EqualTo("Rope"));
-        Assert.That(rope.ShearStiffness, Is.EqualTo(0f));
-        Assert.That(rope.SelfCollision, Is.False);
-    }
-
-    /// <summary>
     /// Verifies that SoftBodyMaterial.Jelly preset has correct volumetric soft body properties.
     /// </summary>
     [Test]
@@ -367,7 +352,6 @@ public class PhysicsTypesTests
     [TestCase(SoftBodyPreset.DrapedCloth, "Cloth")]
     [TestCase(SoftBodyPreset.FlagOnPole, "Cloth")]
     [TestCase(SoftBodyPreset.ClothStack, "Cloth")]
-    [TestCase(SoftBodyPreset.RopePendulum, "Rope")]
     [TestCase(SoftBodyPreset.JellyCube, "Jelly")]
     public void SoftBodyMaterial_FromPreset_ShouldReturnCorrectMaterial(SoftBodyPreset preset, string expectedName)
     {

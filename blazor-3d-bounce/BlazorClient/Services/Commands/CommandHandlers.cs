@@ -1,4 +1,4 @@
-using BlazorClient.Domain.Models;
+﻿using BlazorClient.Domain.Models;
 using BlazorClient.Domain.Common;
 using BlazorClient.Application.Commands;
 using BlazorClient.Application.Events;
@@ -152,10 +152,6 @@ public class SpawnSoftBodyCommandHandler : ICommandHandler<SpawnSoftBodyCommand,
                 body.PinnedVertices.Add(0);
                 body.PinnedVertices.Add(body.ResolutionX);
             }
-            else if (command.Type == SoftBodyType.Rope)
-            {
-                body.PinnedVertices.Add(0);
-            }
 
             // Validate the soft body before creation
             var validation = _validator.ValidateSoftBody(body);
@@ -186,9 +182,6 @@ public class SpawnSoftBodyCommandHandler : ICommandHandler<SpawnSoftBodyCommand,
             {
                 case SoftBodyType.Cloth:
                     await _softPhysics.CreateClothAsync(body);
-                    break;
-                case SoftBodyType.Rope:
-                    await _softPhysics.CreateRopeAsync(body);
                     break;
                 case SoftBodyType.Volumetric:
                     await _softPhysics.CreateVolumetricAsync(body);

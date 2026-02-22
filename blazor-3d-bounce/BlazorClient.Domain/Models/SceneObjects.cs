@@ -1,4 +1,4 @@
-namespace BlazorClient.Domain.Models;
+﻿namespace BlazorClient.Domain.Models;
 
 /// <summary>
 /// Base class for all scene objects (rigid and soft bodies).
@@ -54,13 +54,13 @@ public class SoftBody : SceneObject
     // Mesh resolution
     public int ResolutionX { get; set; } = 20;
     public int ResolutionY { get; set; } = 20;
-    public int Segments { get; set; } = 20; // For rope
+    public int Segments { get; set; } = 20;
     
     // Dimensions
     public float Width { get; set; } = 2.0f;
     public float Height { get; set; } = 2.0f;
     public float Depth { get; set; } = 2.0f; // For volumetric
-    public float Length { get; set; } = 5.0f; // For rope
+    public float Length { get; set; } = 5.0f;
     public float Radius { get; set; } = 0.5f; // For volumetric sphere
     
     // Pinned vertices (indices)
@@ -94,11 +94,6 @@ public class SoftBody : SceneObject
             {
                 PinnedVertices.Add(i * (ResolutionX + 1));
             }
-        }
-        else if (type == SoftBodyType.Rope)
-        {
-            // Pin top of rope
-            PinnedVertices.Add(0);
         }
     }
 }

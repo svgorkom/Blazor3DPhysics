@@ -109,7 +109,7 @@
     @if (Body.Type == SoftBodyType.Cloth)
     {
         <div class="form-group">
-            <label class="form-label">Resolution (X × Y)</label>
+            <label class="form-label">Resolution (X Ã— Y)</label>
             <div class="property-grid">
                 <input type="number" class="form-control" min="2" max="50" step="1"
                        value="@Body.ResolutionX" disabled />
@@ -119,26 +119,13 @@
         </div>
 
         <div class="form-group">
-            <label class="form-label">Size (W × H)</label>
+            <label class="form-label">Size (W Ã— H)</label>
             <div class="property-grid">
                 <input type="number" class="form-control" min="0.1" max="10" step="0.1"
                        value="@Body.Width" disabled />
                 <input type="number" class="form-control" min="0.1" max="10" step="0.1"
                        value="@Body.Height" disabled />
             </div>
-        </div>
-    }
-
-    @if (Body.Type == SoftBodyType.Rope)
-    {
-        <div class="form-group">
-            <label class="form-label">Segments</label>
-            <input type="number" class="form-control" value="@Body.Segments" disabled />
-        </div>
-
-        <div class="form-group">
-            <label class="form-label">Length (m)</label>
-            <input type="number" class="form-control" value="@Body.Length" disabled />
         </div>
     }
 

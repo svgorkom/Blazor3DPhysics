@@ -50,10 +50,6 @@
                 <span class="spawn-btn-icon"><i class="bi bi-grid-3x3"></i></span>
                 <span class="spawn-btn-label">Cloth</span>
             </button>
-            <button class="spawn-btn" @onclick="() => SpawnSoftBody(SoftBodyType.Rope)" disabled="@(!_softBodyAvailable)">
-                <span class="spawn-btn-icon"><i class="bi bi-bezier2"></i></span>
-                <span class="spawn-btn-label">Rope</span>
-            </button>
             <button class="spawn-btn" @onclick="() => SpawnSoftBody(SoftBodyType.Volumetric)" disabled="@(!_softBodyAvailable)">
                 <span class="spawn-btn-icon"><i class="bi bi-dice-3-fill"></i></span>
                 <span class="spawn-btn-label">Jelly</span>
@@ -98,7 +94,13 @@
     </div>
 </div>
 
-<Viewport @ref="_viewport" CanvasId="renderCanvas" OnObjectSelected="SelectObject" />
+<Viewport @ref="_viewport" 
+          CanvasId="renderCanvas" 
+          OnObjectSelected="SelectObject"
+          Fps="@SimulationLoop.Fps"
+          PhysicsTimeMs="@SimulationLoop.PhysicsTimeMs"
+          RigidBodyCount="@SceneState.RigidBodies.Count"
+          SoftBodyCount="@SceneState.SoftBodies.Count" />
 
 <Inspector SelectedRigidBody="@SceneState.SelectedRigidBody"
            SelectedSoftBody="@SceneState.SelectedSoftBody"
@@ -202,7 +204,6 @@
         var preset = type switch
         {
             SoftBodyType.Cloth => SoftBodyPreset.DrapedCloth,
-            SoftBodyType.Rope => SoftBodyPreset.RopePendulum,
             SoftBodyType.Volumetric => SoftBodyPreset.JellyCube,
             _ => SoftBodyPreset.Custom
         };
@@ -222,10 +223,6 @@
             body.PinnedVertices.Add(0);
             body.PinnedVertices.Add(body.ResolutionX);
         }
-        else if (type == SoftBodyType.Rope)
-        {
-            body.PinnedVertices.Add(0);
-        }
 
         SceneState.AddSoftBody(body);
         
@@ -234,9 +231,6 @@
         {
             case SoftBodyType.Cloth:
                 await SoftPhysics.CreateClothAsync(body);
-                break;
-            case SoftBodyType.Rope:
-                await SoftPhysics.CreateRopeAsync(body);
                 break;
             case SoftBodyType.Volumetric:
                 await SoftPhysics.CreateVolumetricAsync(body);

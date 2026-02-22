@@ -192,19 +192,6 @@ public class SceneObjectsTests
     }
 
     /// <summary>
-    /// Verifies that RopePendulum preset pins the top vertex.
-    /// </summary>
-    [Test]
-    public void SoftBody_Rope_ShouldPinTopVertex()
-    {
-        // Act
-        var body = new SoftBody(SoftBodyType.Rope, SoftBodyPreset.RopePendulum);
-
-        // Assert
-        Assert.That(body.PinnedVertices, Contains.Item(0));
-    }
-
-    /// <summary>
     /// Verifies that SoftBody pinned vertices collection is empty by default.
     /// </summary>
     [Test]

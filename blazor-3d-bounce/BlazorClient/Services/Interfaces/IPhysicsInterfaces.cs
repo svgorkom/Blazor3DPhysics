@@ -1,4 +1,4 @@
-using BlazorClient.Models;
+﻿using BlazorClient.Models;
 
 namespace BlazorClient.Services;
 
@@ -45,18 +45,6 @@ public interface IClothPhysicsService
     /// Creates a cloth soft body.
     /// </summary>
     Task CreateClothAsync(SoftBody body);
-}
-
-/// <summary>
-/// Interface for rope physics creation.
-/// Follows Interface Segregation Principle - clients only depend on rope-specific methods.
-/// </summary>
-public interface IRopePhysicsService
-{
-    /// <summary>
-    /// Creates a rope soft body.
-    /// </summary>
-    Task CreateRopeAsync(SoftBody body);
 }
 
 /// <summary>
